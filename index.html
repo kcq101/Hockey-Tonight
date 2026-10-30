@@ -69,20 +69,20 @@ button:focus-visible{outline:2px solid var(--led);outline-offset:2px}
 #goal p span{color:var(--muted);font-weight:600}
 
 /* controls */
-#ctl{flex:none;height:clamp(176px,27vh,236px);display:grid;grid-template-columns:1fr 1fr;border-top:1px solid var(--line);background:
-  repeating-linear-gradient(90deg,rgba(255,255,255,.012) 0 2px,transparent 2px 6px),linear-gradient(#0f1720,#0a1017);padding-bottom:env(safe-area-inset-bottom,0px);
+#ctl{position:absolute;left:0;right:0;bottom:0;z-index:5;height:clamp(176px,27vh,236px);display:grid;grid-template-columns:1fr 1fr;
+  background:linear-gradient(to top,rgba(6,12,20,.32),rgba(6,12,20,0) 70%);padding-bottom:env(safe-area-inset-bottom,0px);
   padding-left:env(safe-area-inset-left,0px);padding-right:env(safe-area-inset-right,0px)}
 #stickZone{position:relative;touch-action:none}
-#stickBase{position:absolute;width:120px;height:120px;margin:-60px 0 0 -60px;left:50%;top:50%;border-radius:50%;border:2px solid #2b3b4e;background:radial-gradient(circle,#162130 0 55%,#101924 56%);transition:opacity .2s}
+#stickBase{position:absolute;width:120px;height:120px;margin:-60px 0 0 -60px;left:50%;top:50%;border-radius:50%;border:2px solid rgba(255,255,255,.35);background:radial-gradient(circle,rgba(14,24,36,.22) 0 55%,rgba(14,24,36,.32) 56%);transition:opacity .2s}
 #stickBase.idle{opacity:.7}
-#stickKnob{position:absolute;left:50%;top:50%;width:54px;height:54px;margin:-27px 0 0 -27px;border-radius:50%;background:radial-gradient(circle at 45% 35%,#3b4b5f,#1a2532 70%);box-shadow:0 4px 10px rgba(0,0,0,.5),inset 0 0 0 2px #45586e}
-.zl{position:absolute;bottom:10px;left:0;right:0;text-align:center;font:700 10px/1 var(--f-ui);letter-spacing:.22em;color:#4f6176;pointer-events:none}
+#stickKnob{position:absolute;left:50%;top:50%;width:54px;height:54px;margin:-27px 0 0 -27px;border-radius:50%;background:radial-gradient(circle at 45% 35%,rgba(70,88,110,.75),rgba(26,37,50,.7) 70%);box-shadow:0 3px 8px rgba(0,0,0,.35),inset 0 0 0 2px rgba(255,255,255,.4)}
+.zl{position:absolute;bottom:10px;left:0;right:0;text-align:center;font:700 10px/1 var(--f-ui);letter-spacing:.22em;color:rgba(255,255,255,.7);text-shadow:0 1px 3px rgba(0,0,0,.6);pointer-events:none}
 #btns{position:relative;touch-action:none}
 .act{position:absolute;border-radius:50%;border:0;display:grid;place-items:center;touch-action:none;
-  background:radial-gradient(circle at 50% 32%,#2c394a,#111923 72%);
-  box-shadow:inset 0 0 0 3px var(--ring),0 6px 0 #04070a,0 12px 18px rgba(0,0,0,.45);transition:transform .05s}
-.act span{font:800 16px/1 var(--f-display);letter-spacing:.1em;pointer-events:none}
-.act.on{transform:translateY(4px);box-shadow:inset 0 0 0 3px var(--ring),0 2px 0 #04070a,0 4px 8px rgba(0,0,0,.45);background:radial-gradient(circle at 50% 32%,#36475b,#16202c 72%)}
+  background:radial-gradient(circle at 50% 32%,rgba(44,57,74,.58),rgba(14,22,32,.5) 72%);
+  box-shadow:inset 0 0 0 3px var(--ring),0 4px 0 rgba(4,7,10,.35),0 8px 14px rgba(0,0,0,.25);transition:transform .05s}
+.act span{font:800 16px/1 var(--f-display);letter-spacing:.1em;pointer-events:none;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.7)}
+.act.on{transform:translateY(4px);box-shadow:inset 0 0 0 3px var(--ring),0 1px 0 rgba(4,7,10,.35),0 3px 6px rgba(0,0,0,.25);background:radial-gradient(circle at 50% 32%,rgba(60,78,100,.72),rgba(20,30,44,.65) 72%)}
 #bPass{--ring:var(--ice);width:82px;height:82px;left:3%;bottom:10%}
 #bShoot{--ring:var(--led);width:104px;height:104px;right:4%;top:3%}
 #bSpd{--ring:#3fd68f;width:60px;height:60px;right:5%;bottom:9%}
@@ -330,13 +330,14 @@ const M={el:null,g:null,on:store.get('blb.mus',true),mode:'title',idx:0,cur:null
 const stage=$('#stage'), cv=$('#cv'), ctx=cv.getContext('2d');
 const rinkCv=document.createElement('canvas'), trailCv=document.createElement('canvas'), tctx=trailCv.getContext('2d');
 const ZOOM=2.3;
-const view={cw:300,ch:400,sc:3,dpr:1};
+const view={cw:300,ch:400,sc:3,dpr:1,ctlH:0};
 let rinkKey='';
 function resize(){
   const r=stage.getBoundingClientRect(), cw=Math.max(1,Math.round(r.width)), ch=Math.max(1,Math.round(r.height));
   const dpr=Math.min(window.devicePixelRatio||1,2);
+  view.ctlH=$('#ctl').getBoundingClientRect().height;
   if(cw===view.cw&&ch===view.ch&&dpr===view.dpr&&cv.width>0) return;
-  view.cw=cw; view.ch=ch; view.dpr=dpr; view.sc=cw/94*ZOOM;
+  view.cw=cw; view.ch=ch; view.dpr=dpr; view.sc=cw/94*ZOOM; view.ctlH=$('#ctl').getBoundingClientRect().height;
   cv.width=Math.round(cw*dpr); cv.height=Math.round(ch*dpr);
   if(G){ const k=rinkScale().toFixed(1)+G.home.def.abbr; if(k!==rinkKey) buildRink(); }
 }
@@ -1034,9 +1035,9 @@ function step(dt){
   for(const f of G.floats){ f.l-=dt; f.y+=dt*4; }
   G.floats=G.floats.filter(f=>f.l>0);
   // camera
-  const P=G.P, tgt=P.y+clamp(P.vy*.22,-12,12), tgx=P.x+clamp(P.vx*.15,-6,6);
+  const P=G.P, tgt=P.y+clamp(P.vy*.22,-12,12)-view.ctlH*.5/view.sc, tgx=P.x+clamp(P.vx*.15,-6,6);
   const k=Math.min(1,dt*5); G.cam+=(tgt-G.cam)*k; G.camX+=(tgx-G.camX)*k;
-  const lim=Math.max(0,104-view.ch/2/view.sc); G.cam=clamp(G.cam,-lim,lim);
+  const hiC=104-view.ch/2/view.sc, loC=-104+(view.ch/2-view.ctlH*.85)/view.sc; G.cam=clamp(G.cam,Math.min(loC,hiC),Math.max(loC,hiC));
   const limX=Math.max(0,47-view.cw/2/view.sc); G.camX=clamp(G.camX,-limX,limX);
 }
 
@@ -1201,9 +1202,10 @@ function render(){
     const pts=[]; if(G.ctrl) pts.push([G.ctrl,'#ffb020']); if(G.passHint&&P.owner===G.ctrl) pts.push([G.passHint,'#5fb8ff']);
     for(const [p,col] of pts){
       const [px,py]=W(p.x,p.y), m=22;
-      if(px>-4&&px<cw+4&&py>-4&&py<ch+4) continue;
-      const cx=cw/2, cy=ch/2, dx=px-cx, dy=py-cy;
-      const t=Math.min((cw/2-m)/Math.abs(dx||1e-6),(ch/2-m)/Math.abs(dy||1e-6));
+      const vb=ch-view.ctlH;
+      if(px>-4&&px<cw+4&&py>-4&&py<vb+4) continue;
+      const cx=cw/2, cy=vb/2, dx=px-cx, dy=py-cy;
+      const t=Math.min((cw/2-m)/Math.abs(dx||1e-6),(vb/2-m)/Math.abs(dy||1e-6));
       const ex=cx+dx*t, ey=cy+dy*t, a=Math.atan2(dy,dx);
       ctx.save(); ctx.translate(ex,ey); ctx.rotate(a);
       ctx.fillStyle='rgba(6,9,13,.75)'; ctx.beginPath(); ctx.arc(0,0,15,0,7); ctx.fill();
