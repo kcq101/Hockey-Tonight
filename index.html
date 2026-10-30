@@ -596,7 +596,7 @@ const M={el:null,g:null,on:store.get('blb.mus',true),mode:'title',idx:0,cur:null
 // ---------------- canvas & view ----------------
 const stage=$('#stage'), cv=$('#cv'), ctx=cv.getContext('2d');
 const rinkCv=document.createElement('canvas'), trailCv=document.createElement('canvas'), tctx=trailCv.getContext('2d');
-const ZOOM=1.3;
+const ZOOM=1.6;
 // 3/4 "arcade tilt": depth is squashed by TILT, and one unit of height lifts HZ world units up the screen
 // lower 'broadcast' camera: depth x0.72 (~46 deg); heights project at cos(46)/0.72 so boards/nets/players stand taller
 const TILT=.72, HZ=.95, PS=1.5, PSG=1.15, PV=1.6, BH=1.85, GH=4.7, FRONT_Y=-66, FRONT_H=38;
@@ -649,7 +649,7 @@ function newGame(hi,ai,diff,len,demo=false){
   buildRink(); clearTrails(); startFaceoff({x:0,y:0}); updateSB(true);
 }
 const skaters=()=>G.home.players.concat(G.away.players);
-const SKATE_PACE=.9; // skating speed for every skater (you, teammates, CPU); 1 = original
+const SKATE_PACE=1; // skating speed for every skater (you, teammates, CPU); 1 = original
 const maxSpd=p=>SKATE_PACE*(23+p.spd*9)*(p.team.human?1:(G.demo?1:G.D.spd))*(G.sprint&&p===G.ctrl?1.45:1);
 
 // ---------------- rink render ----------------
@@ -1039,14 +1039,18 @@ function moveSkater(p,dx,dy,dt){
   const max=maxSpd(p)*(G.P.owner===p?.93:1)*(p.homeT>0?1.25:1)*(G.phase==='goal'&&G.cele&&p.team===G.cele.team?1.3:1), sp=hyp(p.vx,p.vy);
   if(m>.05){
     if(sp>13 && (p.vx*dx+p.vy*dy)/sp<-.35){ if(p.spray<=0) A.spray(p.x,p.y,sp); p.spray=.15; if(Math.random()<.5) G.parts.push({x:p.x+p.vx*.06,y:p.y+p.vy*.06,vx:p.vx*.4+rnd(-6,6),vy:p.vy*.4+rnd(-6,6),l:rnd(.25,.5)}); }
-    let ax=dx*max-p.vx, ay=dy*max-p.vy; const al=hyp(ax,ay), acc=52*SKATE_PACE*dt*(G.sprint&&p===G.ctrl?2:1)*(p.homeT>0?2:1); if(al>acc){ax*=acc/al;ay*=acc/al;}
+    const you=p===G.ctrl&&!G.demo&&p.homeT<=0;
+    // edge grip for the skater you control: sideways drift bleeds off fast, so turns follow the stick
+    if(you&&sp>2){ const ux=dx/m, uy=dy/m, al0=p.vx*ux+p.vy*uy, k=Math.exp(-6*dt); p.vx=al0*ux+(p.vx-al0*ux)*k; p.vy=al0*uy+(p.vy-al0*uy)*k; }
+    let ax=dx*max-p.vx, ay=dy*max-p.vy; const al=hyp(ax,ay), acc=52*SKATE_PACE*dt*(G.sprint&&p===G.ctrl?2:1)*(p.homeT>0?2:1)*(you?1.45:1); if(al>acc){ax*=acc/al;ay*=acc/al;}
     p.vx+=ax; p.vy+=ay;
   } else if(sp>0){ const ns=Math.max(0,sp-(p.down>0?20:13)*dt); p.vx*=ns/sp; p.vy*=ns/sp; }
   p.x+=p.vx*dt; p.y+=p.vy*dt;
   let ta=null; if(m>.2&&p.down<=0) ta=Math.atan2(dy,dx); else if(sp>3) ta=Math.atan2(p.vy,p.vx);
+  p.aim=(m>.2&&p.down<=0&&p.spinT<=0&&p.pokeT<=0)?Math.atan2(dy,dx):null;
   if(p.spinT>0){ p.face+=p.spinDir*2*Math.PI*dt/.5; p.spinT-=dt; ta=null; if(Math.random()<dt*18) G.parts.push({x:p.x,y:p.y,vx:rnd(-10,10),vy:rnd(-10,10),l:rnd(.2,.35)}); }
   else if(p.pokeT>0) ta=null;
-  if(ta!==null){ let d=ta-p.face; while(d>Math.PI)d-=2*Math.PI; while(d<-Math.PI)d+=2*Math.PI; const r=10*dt; p.face+=clamp(d,-r,r); }
+  if(ta!==null){ let d=ta-p.face; while(d>Math.PI)d-=2*Math.PI; while(d<-Math.PI)d+=2*Math.PI; const r=(p===G.ctrl&&!G.demo?20:10)*dt; p.face+=clamp(d,-r,r); }
   const n=rinkConstrain(p,SR);
   if(n){ const vn=p.vx*n.x+p.vy*n.y; if(vn<0){ p.vx-=1.15*vn*n.x; p.vy-=1.15*vn*n.y; if(vn<-15&&p.down>0){ A.slam(-vn,p.x,p.y); G.shake=Math.max(G.shake,.22); } } }
   netWalls(p,SR,true,0);
@@ -1336,7 +1340,9 @@ function stickMove(e){
   if(e.pointerId!==inp.stick.id) return;
   let dx=e.clientX-inp.stick.x, dy=e.clientY-inp.stick.y; const R=48, m=hyp(dx,dy); if(m>R){dx*=R/m;dy*=R/m;}
   knob.style.transform=`translate(${dx}px,${dy}px)`;
-  const dead=m<6?0:1; inp.sx=dx/R*dead; inp.sy=-dy/R*dead;
+  // response curve: 6px dead zone, full speed at ~60% deflection (thumbs rarely push the knob to the rim)
+  const mag=m<6?0:Math.min(1,(m-6)/(R*.6-6));
+  inp.sx=m?dx/hyp(dx,dy)*mag:0; inp.sy=m?-dy/hyp(dx,dy)*mag:0;
 }
 zone.addEventListener('pointermove',stickMove);
 const stickUp=e=>{ if(e.pointerId!==inp.stick.id) return; inp.stick.id=null; inp.sx=inp.sy=0; knob.style.transform=''; base.style.left='50%'; base.style.top='50%'; base.classList.add('idle'); };
@@ -1538,8 +1544,9 @@ function getKit(team){
 // facing -> one of 5 drawn directions; the left half of the compass is the right half mirrored
 const SDIR=['E','NE','N','NE','E','SE','S','SE'], SMIR=[0,0,0,1,1,1,0,0], ADIR=['E','E','N','E','E','E','S','E'];
 const dirIdx=a=>((Math.round(a/(Math.PI/4))%8)+8)%8;
+const visFace=p=>p===G.ctrl&&p.aim!=null&&!G.demo?p.aim:p.face;
 function pickFrame(p){
-  const i=dirIdx(p.face), m=SMIR[i];
+  const i=dirIdx(visFace(p)), m=SMIR[i];
   if(p.g){
     const k=p.y>0?'S':'N';                     // far net: facing the camera; near net: his back to it
     let a='g_ready';
@@ -1709,7 +1716,7 @@ function drawSheen(){
 // Where the puck sits on each sprite's blade, in atlas px from the foot anchor (glide frames; mirrored for the left side).
 const BLADE={S:[-18,-6],SE:[-16,-6],E:[34,-7],NE:[33,-10],N:[51,-23]};
 function bladeWorld(p){
-  const i=dirIdx(p.face), b=BLADE[SDIR[i]], {sc}=view, k=SPR_H*PS*sc/SPR.meta.h0, [sx,sy]=W(p.x,p.y);
+  const i=dirIdx(visFace(p)), b=BLADE[SDIR[i]], {sc}=view, k=SPR_H*PS*sc/SPR.meta.h0, [sx,sy]=W(p.x,p.y);
   const X=sx+(SMIR[i]?-b[0]:b[0])*k, Y=sy+.25*PS*sc+b[1]*k;
   return [G.camX+(X-view.cw/2-G.sx)/sc, G.cam-(Y-view.ch/2-G.sy)/(sc*TILT)];
 }
