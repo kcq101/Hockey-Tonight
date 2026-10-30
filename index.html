@@ -596,9 +596,10 @@ const M={el:null,g:null,on:store.get('blb.mus',true),mode:'title',idx:0,cur:null
 // ---------------- canvas & view ----------------
 const stage=$('#stage'), cv=$('#cv'), ctx=cv.getContext('2d');
 const rinkCv=document.createElement('canvas'), trailCv=document.createElement('canvas'), tctx=trailCv.getContext('2d');
-const ZOOM=2.3;
+const ZOOM=1.3;
 // 3/4 "arcade tilt": depth is squashed by TILT, and one unit of height lifts HZ world units up the screen
-const TILT=.8, HZ=.75, BH=1.85, GH=4.7, FRONT_Y=-66, FRONT_H=38;
+// lower 'broadcast' camera: depth x0.72 (~46 deg); heights project at cos(46)/0.72 so boards/nets/players stand taller
+const TILT=.72, HZ=.95, PS=1.5, PSG=1.15, PV=1.6, BH=1.85, GH=4.7, FRONT_Y=-66, FRONT_H=38;
 const rinkFrontCv=document.createElement('canvas');
 const view={cw:300,ch:400,sc:3,dpr:1,ctlH:0};
 let rinkKey='';
@@ -1482,7 +1483,7 @@ function shadedEllipse(rx,ry,col,edge){ const g=ctx.createRadialGradient(-rx*.25
 function teamColors(p){ const h=p.team.home, d=p.team.def; return h?{jersey:d.c1,trim:d.c2,dark:d.dk,helm:d.dk,pants:d.dk,sock:d.c1,edge:shade(d.c1,.62)}:{jersey:'#f2f5f8',trim:d.c1,dark:d.dk,helm:d.c1,pants:d.dk,sock:'#f2f5f8',edge:'#a3afbb'}; }
 const lerp=(a,b,t)=>a+(b-a)*t, lp=(A,B,t)=>[lerp(A[0],B[0],t),lerp(A[1],B[1],t)];
 function line(a,b,w,col){ ctx.strokeStyle=col; ctx.lineWidth=w; ctx.beginPath(); ctx.moveTo(a[0],a[1]); ctx.lineTo(b[0],b[1]); ctx.stroke(); }
-const BODY=1.35;
+const BODY=1.35*PS;
 // 3/4 view: bodies are drawn in layers that lift toward the top of the screen by height above the ice.
 // U is the body-local vector for one unit of height (world +y, i.e. screen up, undone through the body's rotation).
 const rotV=(U,a)=>{ const c=Math.cos(a), s=Math.sin(a); return [U[0]*c+U[1]*s, -U[0]*s+U[1]*c]; };
@@ -1567,10 +1568,10 @@ function pickFrame(p){
 function drawSprite(p){
   const kit=getKit(p.team); if(!kit) return false;
   const [nm,mir]=pickFrame(p), f=SPR.meta.frames[nm]; if(!f) return false;
-  const {sc,dpr}=view, k=(p.g?SPR_GH:SPR_H)*sc*dpr/(p.g?SPR.meta.hg:SPR.meta.h0);
+  const {sc,dpr}=view, k=(p.g?SPR_GH*PSG:SPR_H*PS)*sc*dpr/(p.g?SPR.meta.hg:SPR.meta.h0);
   const [sx,sy]=W(p.x,p.y), hop=p.celeb&&G.phase==='goal'?Math.abs(Math.sin(G.t*8+p.weave))*.55*sc*dpr:0;
   ctx.save(); ctx.setTransform(1,0,0,1,0,0); ctx.imageSmoothingEnabled=true; ctx.imageSmoothingQuality='high';
-  ctx.translate(sx*dpr,sy*dpr+.25*sc*dpr-hop);
+  ctx.translate(sx*dpr,sy*dpr+.25*PS*sc*dpr-hop);
   if(p.down>0) ctx.rotate((p.face>-Math.PI/2&&p.face<Math.PI/2?1:-1)*1.25);   // knocked down: lying on the ice
   if(mir) ctx.scale(-1,1);
   ctx.drawImage(kit,f[0],f[1],f[2],f[3],-f[4]*k,-f[3]*k,f[2]*k,f[3]*k);
@@ -1579,9 +1580,9 @@ function drawSprite(p){
 function drawSkater(p){
   if(!SPR.meta) return drawSkaterVec(p);
   ctx.lineCap='round'; ctx.lineJoin='round';
-  blob(p.x+.35,p.y-.2,p.g?2.6:1.85,p.g?1.5:1.05,'#14283f',.42);
-  if(p===G.ctrl && !G.demo){ const pu=Math.sin(G.t*6)*.2; ctx.strokeStyle='rgba(255,176,32,.9)'; ctx.lineWidth=.22; ctx.beginPath(); ctx.ellipse(p.x,p.y,2.6+pu,2+pu,0,0,7); ctx.stroke(); }
-  if(G.P.owner===p && p!==G.ctrl && !G.demo){ ctx.strokeStyle=hexA(p.team.def.c1,.85); ctx.lineWidth=.2; ctx.beginPath(); ctx.ellipse(p.x,p.y,2.4,1.85,0,0,7); ctx.stroke(); }
+  { const q=p.g?PSG:PS; blob(p.x+.35*q,p.y-.2*q,(p.g?2.6:1.85)*q,(p.g?1.5:1.05)*q/TILT*.8,'#14283f',.42); }
+  if(p===G.ctrl && !G.demo){ const pu=Math.sin(G.t*6)*.2; ctx.strokeStyle='rgba(255,176,32,.9)'; ctx.lineWidth=.22; ctx.beginPath(); ctx.ellipse(p.x,p.y,(2.6+pu)*PS,(2+pu)*PS/TILT*.8,0,0,7); ctx.stroke(); }
+  if(G.P.owner===p && p!==G.ctrl && !G.demo){ ctx.strokeStyle=hexA(p.team.def.c1,.85); ctx.lineWidth=.2; ctx.beginPath(); ctx.ellipse(p.x,p.y,2.4*PS,1.85*PS/TILT*.8,0,0,7); ctx.stroke(); }
   if(!drawSprite(p)) drawSkaterVec(p);
 }
 function drawSkate(x,y,r){ ctx.save(); ctx.translate(x,y); ctx.rotate(r); ctx.fillStyle='#181c21'; rrect(-.21,-.48,.42,1.02,.18); ctx.fill(); ctx.strokeStyle='#dfe7ee'; ctx.lineWidth=.06; ctx.beginPath(); ctx.moveTo(0,-.62); ctx.lineTo(0,.66); ctx.stroke(); ctx.restore(); }
@@ -1708,8 +1709,8 @@ function drawSheen(){
 // Where the puck sits on each sprite's blade, in atlas px from the foot anchor (glide frames; mirrored for the left side).
 const BLADE={S:[-18,-6],SE:[-16,-6],E:[34,-7],NE:[33,-10],N:[51,-23]};
 function bladeWorld(p){
-  const i=dirIdx(p.face), b=BLADE[SDIR[i]], {sc}=view, k=SPR_H*sc/SPR.meta.h0, [sx,sy]=W(p.x,p.y);
-  const X=sx+(SMIR[i]?-b[0]:b[0])*k, Y=sy+.25*sc+b[1]*k;
+  const i=dirIdx(p.face), b=BLADE[SDIR[i]], {sc}=view, k=SPR_H*PS*sc/SPR.meta.h0, [sx,sy]=W(p.x,p.y);
+  const X=sx+(SMIR[i]?-b[0]:b[0])*k, Y=sy+.25*PS*sc+b[1]*k;
   return [G.camX+(X-view.cw/2-G.sx)/sc, G.cam-(Y-view.ch/2-G.sy)/(sc*TILT)];
 }
 const PD={off:[0,0]};
@@ -1722,12 +1723,12 @@ function drawPuck(P){
   // hard shots ride up off the ice (visual only)
   const sh=!o&&P.shot, z=(sh&&sh.spd>80?clamp((sh.spd-80)/32,0,1)*1.7*Math.sin(Math.PI*clamp(sh.t/.4,0,1)):0)+lift*1.3, zy=z*HZ, y=py+zy;
   if(!o&&sp>40){
-    blob(px,y,1.6,1.6,'#ffffff',clamp((sp-40)/60,0,.55));       // soft glow so a fast puck stays visible in traffic
-    ctx.lineCap='round'; for(let i=1;i<=4;i++){ ctx.strokeStyle=`rgba(30,40,55,${.14/i})`; ctx.lineWidth=.9-i*.12; ctx.beginPath(); ctx.moveTo(px,y); ctx.lineTo(px-P.vx*.02*i,y-P.vy*.02*i); ctx.stroke(); }
+    blob(px,y,1.6*PV,1.6*PV,'#ffffff',clamp((sp-40)/60,0,.55));       // soft glow so a fast puck stays visible in traffic
+    ctx.lineCap='round'; for(let i=1;i<=4;i++){ ctx.strokeStyle=`rgba(30,40,55,${.14/i})`; ctx.lineWidth=(.9-i*.12)*PV; ctx.beginPath(); ctx.moveTo(px,y); ctx.lineTo(px-P.vx*.02*i,y-P.vy*.02*i); ctx.stroke(); }
   }
-  blob(px+.25+z*.25,py-.22,.62+z*.15,.5+z*.1,'#14283f',.45-z*.1);
-  const r=.42+z*.05;
-  ctx.fillStyle='rgba(255,255,255,.92)'; ctx.beginPath(); ctx.ellipse(px,y-.04,r+.14,(r+.14)*.95,0,0,7); ctx.fill();   // light rim: reads against skates and shadows
+  blob(px+.25*PV+z*.25,py-.22*PV,(.62+z*.15)*PV,(.5+z*.1)*PV,'#14283f',.45-z*.1);
+  const r=(.42+z*.05)*PV;
+  ctx.fillStyle='rgba(255,255,255,.92)'; ctx.beginPath(); ctx.ellipse(px,y-.04,r+.14*PV,(r+.14*PV)*.95,0,0,7); ctx.fill();   // light rim: reads against skates and shadows
   ctx.fillStyle='#202327'; ctx.beginPath(); ctx.ellipse(px,y-.12,r,r*.9,0,0,7); ctx.fill();
   ctx.fillStyle='#0c0d0f'; ctx.beginPath(); ctx.arc(px,y,r,0,7); ctx.fill();
   ctx.strokeStyle='rgba(255,255,255,.3)'; ctx.lineWidth=.08; ctx.beginPath(); ctx.arc(px,y,r*.72,Math.PI*.55,Math.PI*1.05); ctx.stroke();
@@ -1769,10 +1770,10 @@ function render(){
   const vg=ctx.createRadialGradient(cw/2,ch/2,Math.min(cw,ch)*.35,cw/2,ch/2,Math.max(cw,ch)*.75); vg.addColorStop(0,'rgba(8,24,44,0)'); vg.addColorStop(1,'rgba(8,24,44,.28)'); ctx.fillStyle=vg; ctx.fillRect(0,0,cw,ch);
   ctx.textAlign='center'; ctx.textBaseline='middle';
   if(!G.demo){
-    if(G.passHint && P.owner===G.ctrl){ const [hx,hy]=W(G.passHint.x,G.passHint.y+6); const b=Math.sin(G.t*8)*2; ctx.fillStyle='#5fb8ff'; ctx.beginPath(); ctx.moveTo(hx-6,hy-6+b); ctx.lineTo(hx+6,hy-6+b); ctx.lineTo(hx,hy+2+b); ctx.closePath(); ctx.fill(); }
+    if(G.passHint && P.owner===G.ctrl){ const [hx,hy]=W(G.passHint.x,G.passHint.y+(SPR_H*PS+1.2)/TILT); const b=Math.sin(G.t*8)*2; ctx.fillStyle='#5fb8ff'; ctx.beginPath(); ctx.moveTo(hx-6,hy-6+b); ctx.lineTo(hx+6,hy-6+b); ctx.lineTo(hx,hy+2+b); ctx.closePath(); ctx.fill(); }
     const lab=new Set([G.ctrl]); if(P.owner) lab.add(P.owner);
     ctx.font='700 11px "Barlow Semi Condensed", "Arial Narrow", sans-serif';
-    for(const p of lab){ if(!p) continue; const [lx,ly]=W(p.x,p.y-3.2); const t=`#${p.num} ${p.name}`; const w=ctx.measureText(t).width+10;
+    for(const p of lab){ if(!p) continue; const [lx,ly]=W(p.x,p.y-2.4*PS); const t=`#${p.num} ${p.name}`; const w=ctx.measureText(t).width+10;
       ctx.fillStyle=p===G.ctrl?'rgba(255,176,32,.92)':'rgba(10,16,23,.78)'; ctx.beginPath(); ctx.roundRect?ctx.roundRect(lx-w/2,ly-8,w,16,4):ctx.rect(lx-w/2,ly-8,w,16); ctx.fill();
       ctx.fillStyle=p===G.ctrl?'#1d1200':'#e9eef2'; ctx.fillText(t,lx,ly+.5);
       if(p===G.ctrl&&G.stam<.995){ const bw=Math.max(34,w-8); ctx.fillStyle='rgba(6,9,13,.7)'; ctx.fillRect(lx-bw/2,ly+10,bw,4); ctx.fillStyle=G.stamLock?'#e5383e':G.stam<.3?'#ffb020':'#3fd68f'; ctx.fillRect(lx-bw/2,ly+10,bw*G.stam,4); } }
