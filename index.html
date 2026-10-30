@@ -85,21 +85,24 @@ button:focus-visible{outline:2px solid var(--led);outline-offset:2px}
   box-shadow:inset 0 0 0 3px var(--ring),0 4px 0 rgba(4,7,10,.35),0 8px 14px rgba(0,0,0,.25);transition:transform .05s}
 .act span{font:800 16px/1 var(--f-display);letter-spacing:.1em;pointer-events:none;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.7)}
 .act.on{transform:translateY(4px);box-shadow:inset 0 0 0 3px var(--ring),0 1px 0 rgba(4,7,10,.35),0 3px 6px rgba(0,0,0,.25);background:radial-gradient(circle at 50% 32%,rgba(60,78,100,.72),rgba(20,30,44,.65) 72%)}
-#bPass{--ring:var(--ice);width:82px;height:82px;left:3%;bottom:10%}
-#bShoot{--ring:var(--led);width:104px;height:104px;right:4%;top:3%}
-#bSpd{--ring:#3fd68f;width:60px;height:60px;right:5%;bottom:9%}
-#bPoke{--ring:#c49bff;width:62px;height:62px;left:4%;top:4%}
-#bPoke span{font-size:12px}
-#bShoot.ready{animation:rdy .45s ease-in-out infinite alternate}
+/* four equal buttons in a diamond: X top, Y left, A right, B bottom */
+.dia{position:absolute;right:max(10px,env(safe-area-inset-right,0px));bottom:8px;--s:62px;--o:58px;width:calc(2*var(--o) + var(--s));height:calc(2*var(--o) + var(--s))}
+.dia .act{width:var(--s);height:var(--s)}
+.dia .act span{font-size:13px;line-height:1.05;text-align:center;letter-spacing:.06em}
+#bX{--ring:#3fd68f;left:var(--o);top:0}
+#bY{--ring:#c49bff;left:0;top:var(--o)}
+#bA{--ring:var(--led);left:calc(2*var(--o));top:var(--o)}
+#bB{--ring:var(--ice);left:var(--o);top:calc(2*var(--o))}
+.act.ready{animation:rdy .45s ease-in-out infinite alternate}
 @keyframes rdy{to{box-shadow:inset 0 0 0 3px var(--ring),0 0 0 4px rgba(255,176,32,.35),0 0 24px rgba(255,176,32,.85)}}
-#bSpd span{font-size:12px}
-#bSpd::before{content:"";position:absolute;inset:-6px;border-radius:50%;background:conic-gradient(var(--sc,#3fd68f) calc(var(--st,1)*1turn),rgba(255,255,255,.08) 0);
+.act.hit{box-shadow:inset 0 0 0 3px #ff5a4a,0 0 18px rgba(255,90,74,.6)}
+#bX::before{content:"";position:absolute;inset:-6px;border-radius:50%;background:conic-gradient(var(--sc,#3fd68f) calc(var(--st,1)*1turn),rgba(255,255,255,.08) 0);
   -webkit-mask:radial-gradient(farthest-side,transparent calc(100% - 5px),#000 calc(100% - 4px));mask:radial-gradient(farthest-side,transparent calc(100% - 5px),#000 calc(100% - 4px))}
-#bSpd.empty{opacity:.55}
-@media (max-height:720px){#bShoot{width:92px;height:92px}#bPass{width:74px;height:74px}#bSpd{width:56px;height:56px}#bPoke{width:56px;height:56px}#bPoke span{font-size:11px}.act span{font-size:14px}#bSpd span{font-size:11px}#stickBase{transform:scale(.9)}}
-#bSpd.go{box-shadow:inset 0 0 0 3px var(--ring),0 2px 0 #04070a,0 0 18px rgba(63,214,143,.55)}
-#bShoot::before{content:"";position:absolute;inset:-8px;border-radius:50%;background:conic-gradient(var(--red) calc(var(--pw,0)*1turn),transparent 0);
-  -webkit-mask:radial-gradient(farthest-side,transparent calc(100% - 6px),#000 calc(100% - 5px));mask:radial-gradient(farthest-side,transparent calc(100% - 6px),#000 calc(100% - 5px))}
+#bX.empty{opacity:.55}
+.act.go{box-shadow:inset 0 0 0 3px var(--ring),0 2px 0 #04070a,0 0 18px rgba(63,214,143,.55)}
+#bY::after{content:"";position:absolute;inset:-6px;border-radius:50%;background:conic-gradient(var(--red) calc(var(--pw,0)*1turn),transparent 0);
+  -webkit-mask:radial-gradient(farthest-side,transparent calc(100% - 5px),#000 calc(100% - 4px));mask:radial-gradient(farthest-side,transparent calc(100% - 5px),#000 calc(100% - 4px))}
+@media (max-height:720px){.dia{--s:54px;--o:50px}.dia .act span{font-size:11px}#stickBase{transform:scale(.9)}}
 
 /* overlays */
 .ov{position:absolute;inset:0;z-index:20;overflow-y:auto;-webkit-overflow-scrolling:touch;touch-action:pan-y;
@@ -245,10 +248,12 @@ table.st{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
   <div id="ctl">
     <div id="stickZone"><div id="stickBase" class="idle"><div id="stickKnob"></div></div><div class="zl">SKATE</div></div>
     <div id="btns">
-      <button id="bPass" class="act" aria-label="Pass"><span>PASS</span></button>
-      <button id="bShoot" class="act" aria-label="Shoot"><span>SHOOT</span></button>
-      <button id="bSpd" class="act" aria-label="Speed burst"><span>SPEED</span></button>
-      <button id="bPoke" class="act" aria-label="Poke check or spin"><span>POKE</span></button>
+      <div class="dia">
+        <button id="bX" class="act" aria-label="Speed burst"><span>SPEED</span></button>
+        <button id="bY" class="act" aria-label="Slapshot or poke check"><span>SLAP<br>SHOT</span></button>
+        <button id="bA" class="act" aria-label="Wrist shot or body check"><span>WRIST<br>SHOT</span></button>
+        <button id="bB" class="act" aria-label="Pass or switch player"><span>PASS</span></button>
+      </div>
     </div>
   </div>
 
@@ -270,7 +275,7 @@ table.st{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
           <div class="lcard">
             <div class="lpanel"><button class="arw" data-side="home" data-d="-1" aria-label="Previous team"><svg viewBox="0 0 12 16"><path d="M12 0v16L0 8z"/></svg></button><canvas id="lH" width="48" height="48"></canvas><button class="arw" data-side="home" data-d="1" aria-label="Next team"><svg viewBox="0 0 12 16"><path d="M0 0v16l12-8z"/></svg></button></div>
             <div class="tname" id="nH"></div>
-            <div class="bars" id="bH"></div>
+            <div class="bars" id="rH"></div>
           </div>
         </div>
         <div class="vs chrome">VS</div>
@@ -280,7 +285,7 @@ table.st{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
           <div class="lcard">
             <div class="lpanel"><button class="arw" data-side="away" data-d="-1" aria-label="Previous team"><svg viewBox="0 0 12 16"><path d="M12 0v16L0 8z"/></svg></button><canvas id="lA" width="48" height="48"></canvas><button class="arw" data-side="away" data-d="1" aria-label="Next team"><svg viewBox="0 0 12 16"><path d="M0 0v16l12-8z"/></svg></button></div>
             <div class="tname" id="nA"></div>
-            <div class="bars" id="bA"></div>
+            <div class="bars" id="rA"></div>
           </div>
         </div>
       </div>
@@ -305,14 +310,15 @@ table.st{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
         <button class="pxBtn pri" id="bOptBack">Done</button>
         <dl class="how">
         <dt>Stick</dt><dd>Touch anywhere on the left to skate.</dd>
-        <dt>Pass</dt><dd>Tap to pass where you're skating, or swipe off the button toward a teammate. You can also tap a teammate on the ice.</dd>
-        <dt>Speed</dt><dd>Hold for a burst on offense or defense. The green ring is your stamina; it refills when you let go.</dd>
-        <dt>Shoot</dt><dd>Tap for a wrister, hold to wind up a slapper. Swipe off the button to pick your corner.</dd>
-        <dt>One-timer</dt><dd>Press Shoot while a pass is on its way to you (the Shoot button glows). Cross-ice one-timers are the hardest for goalies.</dd>
-        <dt>Spin-o-rama</dt><dd>While carrying, circle the stick all the way around, or tap Spin. Shoot right after and the goalie has bitten on the deke.</dd>
+        <dt>Buttons</dt><dd>Four buttons in a diamond. Top: Speed. Left: Slapshot / Poke check. Right: Wrist shot / Body check. Bottom: Pass / Switch player.</dd>
+        <dt>Speed</dt><dd>Hold the top button for a burst. The green ring is your stamina; it refills when you let go.</dd>
+        <dt>Pass</dt><dd>Tap the bottom button to pass where you're skating, or swipe off it toward a teammate. You can also tap a teammate on the ice.</dd>
+        <dt>Shots</dt><dd>Right button is a quick wrist shot. Left button winds up a slapshot: hold to power it up, let go to fire. Swipe off either to pick your corner.</dd>
+        <dt>One-timer</dt><dd>Press either shot button while a pass is on its way to you (they glow). Cross-ice one-timers are the hardest for goalies.</dd>
+        <dt>Spin-o-rama</dt><dd>While carrying, circle the stick all the way around. Shoot right after and the goalie has bitten on the deke.</dd>
         <dt>Wraparound</dt><dd>Carry the puck behind the net and come out the other side. Shoot right away to stuff it in at the post.</dd>
-        <dt>Defense</dt><dd>Pass becomes Switch. Check locks onto the nearest opponent and drives through him. Poke reaches out with your stick to knock the puck loose.</dd>
-        <dt>Keys</dt><dd>WASD or arrows, J pass, K shoot, U poke/spin, L or Shift speed, P pause.</dd>
+        <dt>Defense</dt><dd>Top and right buttons are a speed burst, and turn into a body check when an opponent is close (they turn red and say Check). Left button pokes the puck loose with your stick. Bottom button switches player.</dd>
+        <dt>Keys</dt><dd>WASD or arrows. L or Shift: top. U: left. K or Space: right. J: bottom. P pause.</dd>
       </dl>
       </div>
     </div>
@@ -688,13 +694,18 @@ function applyHit(c,v){
 }
 
 // assisted check for the player you control: locks onto the carrier (or nearest opponent) and drives through him
-function humanCheck(c){
-  if(c.checkCool>0||c.down>0) return; c.checkCool=.6; c.lungeT=.3;
+function checkTarget(c,carR,anyR){
   const P=G.P; let v=null, vd=1e9;
   const car=P.owner&&P.owner.team!==c.team&&P.owner.down<=0?P.owner:null;
-  if(car){ const d=hyp(car.x-c.x,car.y-c.y); if(d<11){ v=car; vd=d; } }
-  if(!v) for(const o of c.team.opp.players){ if(o.down>0) continue; const d=hyp(o.x-c.x,o.y-c.y); if(d<7.5&&d<vd){ vd=d; v=o; } }
+  if(car){ const d=hyp(car.x-c.x,car.y-c.y); if(d<carR){ v=car; vd=d; } }
+  if(!v) for(const o of c.team.opp.players){ if(o.down>0) continue; const d=hyp(o.x-c.x,o.y-c.y); if(d<anyR&&d<vd){ vd=d; v=o; } }
+  return v;
+}
+function humanCheck(c,v){
+  if(c.checkCool>0||c.down>0) return; c.checkCool=.6; c.lungeT=.3;
+  if(v===undefined) v=checkTarget(c,11,7.5);
   if(!v){ c.vx+=Math.cos(c.face)*9; c.vy+=Math.sin(c.face)*9; return; }
+  const vd=hyp(v.x-c.x,v.y-c.y)||1;
   c.face=Math.atan2(v.y-c.y,v.x-c.x);
   const sp=Math.max(hyp(c.vx,c.vy),22), ux=(v.x-c.x)/vd, uy=(v.y-c.y)/vd; c.vx=ux*sp; c.vy=uy*sp;
   c.checkTgt=v; c.homeT=.38;
@@ -1056,7 +1067,7 @@ function updPuck(dt){
 function receive(s){
   const P=G.P, wasPass=P.pass&&P.pass.to===s;
   setOwner(s);
-  if(s===G.ctrl && wasPass && (G.oneT>0||(inp.shoot.down&&!G.charging))){ G.oneT=0; shoot(s,.92,null,true); return; }
+  if(s===G.ctrl && wasPass && (G.oneT>0||((inp.a.down||inp.y.down)&&!G.charging))){ G.oneT=0; shoot(s,.92,null,true); return; }
   if(s===G.ctrl && wasPass) G.oneTLate=.25;
   if(!s.team.human && wasPass){ const f=s.y*s.team.dir; if(f>58&&Math.abs(s.x)<22&&Math.random()<.4*(G.demo?1:G.D.aggr)) shoot(s,rnd(.7,1),null,true); }
 }
@@ -1080,7 +1091,7 @@ function startFaceoff(spot){
 function faceoffUpdate(dt){
   G.phaseT+=dt; const drop=.95;
   if(!G.foDropped && G.phaseT>=drop){ G.foDropped=true; A.drop(); }
-  if(G.home.human && G.foPress===null && (inp.pass.pressed||inp.shoot.pressed)) G.foPress=G.phaseT;
+  if(G.home.human && G.foPress===null && (inp.x.pressed||inp.y.pressed||inp.a.pressed||inp.b.pressed)) G.foPress=G.phaseT;
   const fp=G.foPress;
   if(G.phaseT>=drop+.35 || (fp!==null && fp>=drop-.12 && G.phaseT>=drop+.05)){
     let hw;
@@ -1133,7 +1144,7 @@ function endGame(){
 
 // ---------------- input ----------------
 const mkBtn=()=>({down:false,pressed:false,released:false,id:null,sx:0,sy:0,dx:0,dy:0,asOwner:false});
-const inp={mx:0,my:0,stick:{id:null,x:0,y:0},pass:mkBtn(),shoot:mkBtn(),speed:mkBtn(),poke:mkBtn(),taps:[]};
+const inp={mx:0,my:0,stick:{id:null,x:0,y:0},x:mkBtn(),y:mkBtn(),a:mkBtn(),b:mkBtn(),taps:[]};
 const isOwner=()=>!!(G&&G.P.owner&&G.P.owner===G.ctrl);
 function pressBtn(b){ b.down=true; b.pressed=true; b.dx=b.dy=0; b.asOwner=isOwner(); }
 function bindBtn(el,b){
@@ -1143,7 +1154,7 @@ function bindBtn(el,b){
   el.addEventListener('pointerup',up); el.addEventListener('pointercancel',up);
   el.addEventListener('contextmenu',e=>e.preventDefault());
 }
-bindBtn($('#bPass'),inp.pass); bindBtn($('#bShoot'),inp.shoot); bindBtn($('#bSpd'),inp.speed); bindBtn($('#bPoke'),inp.poke);
+bindBtn($('#bX'),inp.x); bindBtn($('#bY'),inp.y); bindBtn($('#bA'),inp.a); bindBtn($('#bB'),inp.b);
 const zone=$('#stickZone'), base=$('#stickBase'), knob=$('#stickKnob');
 zone.addEventListener('pointerdown',e=>{
   if(inp.stick.id!==null) return; e.preventDefault(); try{zone.setPointerCapture(e.pointerId);}catch(_){}
@@ -1174,17 +1185,18 @@ addEventListener('keydown',e=>{
   const k=e.key.toLowerCase();
   if(['arrowup','arrowdown','arrowleft','arrowright',' '].includes(k)) e.preventDefault();
   if(keys.has(k)) return; keys.add(k);
-  if(k==='j'||k==='z') pressBtn(inp.pass);
-  if(k==='l'||k==='shift') pressBtn(inp.speed);
-  if(k==='u'||k==='c') pressBtn(inp.poke);
-  if(k==='k'||k==='x'||k===' ') pressBtn(inp.shoot);
+  if(k==='j'||k==='z') pressBtn(inp.b);
+  if(k==='l'||k==='shift') pressBtn(inp.x);
+  if(k==='u'||k==='c') pressBtn(inp.y);
+  if(k==='k'||k==='x'||k===' ') pressBtn(inp.a);
   if(k==='p'||k==='escape') togglePause();
 });
 addEventListener('keyup',e=>{ const k=e.key.toLowerCase(); keys.delete(k);
-  if(k==='j'||k==='z'){ inp.pass.down=false; inp.pass.released=true; }
-  if(k==='l'||k==='shift'){ inp.speed.down=false; inp.speed.released=true; }
-  if(k==='u'||k==='c'){ inp.poke.down=false; inp.poke.released=true; }
-  if(k==='k'||k==='x'||k===' '){ inp.shoot.down=false; inp.shoot.released=true; }
+  const up=b=>{ b.down=false; b.released=true; };
+  if(k==='j'||k==='z') up(inp.b);
+  if(k==='l'||k==='shift') up(inp.x);
+  if(k==='u'||k==='c') up(inp.y);
+  if(k==='k'||k==='x'||k===' ') up(inp.a);
 });
 function readMove(){
   let kx=(keys.has('d')||keys.has('arrowright')?1:0)-(keys.has('a')||keys.has('arrowleft')?1:0);
@@ -1202,22 +1214,29 @@ function humanActions(){
   }
   if(P.owner===G.ctrl){
     const o=G.ctrl;
-    if(inp.pass.released && inp.pass.asOwner){ const t=pickPassTarget(o,swipe(inp.pass)||stickV()); if(t) passTo(o,t); }
-    else if(inp.shoot.pressed && G.oneTLate>0){ G.oneTLate=0; G.charging=false; shoot(o,.92,null,true); }
-    else {
-      if(inp.poke.pressed){ const v=stickV(); doSpin(o,v&&(v.x*Math.sin(o.face)-v.y*Math.cos(o.face))>0?-1:1); }
-      if(inp.shoot.pressed){ G.charging=true; G.chargeT=0; }
-      if(G.charging && inp.shoot.released){ G.charging=false; shoot(o,.32+.68*clamp(G.chargeT/.55,0,1),swipe(inp.shoot),false); }
-    }
+    G.holdChecked=false;
+    if((inp.a.pressed||inp.y.pressed) && G.oneTLate>0){ G.oneTLate=0; G.charging=false; shoot(o,.92,null,true); return; }
+    // bottom: pass (tap, or swipe toward a teammate)
+    if(inp.b.released && inp.b.asOwner){ const t=pickPassTarget(o,swipe(inp.b)||stickV()); if(t){ passTo(o,t); return; } }
+    // right: quick wrist shot on release (swipe to pick a corner)
+    if(inp.a.released && inp.a.asOwner && !G.charging){ shoot(o,.48,swipe(inp.a),false); return; }
+    // left: slapshot, hold to wind up and let go to fire
+    if(inp.y.pressed && inp.y.asOwner){ G.charging=true; G.chargeT=0; }
+    if(G.charging && inp.y.released){ G.charging=false; shoot(o,.62+.38*clamp(G.chargeT/.55,0,1),swipe(inp.y),false); }
   } else {
     G.charging=false;
-    const incoming=P.pass&&P.pass.to===G.ctrl;
-    if(inp.shoot.pressed){ if(incoming) G.oneT=.8; else humanCheck(G.ctrl); }
-    if(inp.poke.pressed) tryPoke(G.ctrl);
-    if(inp.pass.pressed && !incoming) switchPlayer();
+    const c=G.ctrl, incoming=P.pass&&P.pass.to===c;
+    if(incoming){ if(inp.a.pressed||inp.y.pressed) G.oneT=.8; return; }
+    // top and right: speed burst, or a body check when an opponent is close
+    if(inp.x.pressed||inp.a.pressed){ const v=checkTarget(c,10,6.5); if(v){ humanCheck(c,v); G.holdChecked=true; } else G.holdChecked=false; }
+    if((inp.x.down||inp.a.down) && !G.holdChecked && c.checkCool<=0){ const car=P.owner&&P.owner.team!==c.team?P.owner:null; if(car&&car.down<=0&&hyp(car.x-c.x,car.y-c.y)<4.6){ humanCheck(c,car); G.holdChecked=true; } }
+    // left: poke check
+    if(inp.y.pressed) tryPoke(c);
+    // bottom: switch player
+    if(inp.b.pressed) switchPlayer();
   }
 }
-function clearEdges(){ for(const b of [inp.pass,inp.shoot,inp.speed,inp.poke]){ b.pressed=false; b.released=false; } inp.taps.length=0; }
+function clearEdges(){ for(const b of [inp.x,inp.y,inp.a,inp.b]){ b.pressed=false; b.released=false; } inp.taps.length=0; }
 
 // ---------------- step ----------------
 function step(dt){
@@ -1231,10 +1250,11 @@ function step(dt){
     G.spinAcc*=Math.exp(-dt*1.8);
     if(Math.abs(G.spinAcc)>4.4){ doSpin(G.ctrl,Math.sign(G.spinAcc)); G.spinAcc=0; }
   } else { G.spinAcc=0; G.spinA=null; }
-  if(G.charging&&inp.shoot.down) G.chargeT+=dt;
+  if(G.charging&&inp.y.down) G.chargeT+=dt;
   // speed burst: drains while held and moving, refills after a short rest
   const canGo=G.home.human&&G.ctrl&&G.ctrl.down<=0&&(G.phase==='play'||G.phase==='goal')&&hyp(inp.mx,inp.my)>.2;
-  G.sprint=!!(canGo&&inp.speed.down&&!G.stamLock&&G.stam>0);
+  const onD=G.ctrl&&G.P.owner!==G.ctrl;
+  G.sprint=!!(canGo&&(inp.x.down||(onD&&inp.a.down))&&!G.stamLock&&G.stam>0);
   if(G.sprint){ G.stam=Math.max(0,G.stam-dt/2.6); G.stamIdle=0; if(G.stam<=0) G.stamLock=true;
     if(Math.random()<dt*22){ const c=G.ctrl; G.parts.push({x:c.x-c.vx*.05,y:c.y-c.vy*.05,vx:-c.vx*.15+rnd(-4,4),vy:-c.vy*.15+rnd(-4,4),l:rnd(.2,.4)}); } }
   else { G.stamIdle+=dt; if(G.stamIdle>.5) G.stam=Math.min(1,G.stam+dt/4.5); if(G.stamLock&&G.stam>=.3) G.stamLock=false; }
@@ -1496,10 +1516,17 @@ let lblCache='';
 function updateButtons(){
   if(!G||G.demo) return;
   const P=G.P, own=P.owner&&P.owner===G.ctrl, inc=P.pass&&P.pass.to===G.ctrl;
-  const k=own?'o':inc?'i':'d';
-  if(k!==lblCache){ lblCache=k; $('#bPass span').textContent=own||inc?'PASS':'SWITCH'; $('#bShoot span').textContent=own?'SHOOT':inc?'1-TIMER':'CHECK'; $('#bPoke span').textContent=own?'SPIN':'POKE'; $('#bShoot').classList.toggle('ready',!!inc); }
-  $('#bShoot').style.setProperty('--pw',G.charging?clamp(G.chargeT/.55,0,1).toFixed(3):0);
-  const sb=$('#bSpd'); sb.style.setProperty('--st',G.stam.toFixed(3)); sb.style.setProperty('--sc',G.stamLock?'#e5383e':G.stam<.3?'#ffb020':'#3fd68f');
+  const near=!own&&!inc&&G.ctrl&&!!checkTarget(G.ctrl,10,6.5);
+  const k=own?'o':inc?'i':near?'n':'d';
+  if(k!==lblCache){ lblCache=k;
+    const L={o:['SPEED','SLAP<br>SHOT','WRIST<br>SHOT','PASS'],i:['SPEED','ONE<br>TIMER','ONE<br>TIMER','PASS'],d:['SPEED','POKE<br>CHECK','SPEED','SWITCH'],n:['CHECK','POKE<br>CHECK','CHECK','SWITCH']}[k];
+    ['#bX','#bY','#bA','#bB'].forEach((id,n)=>{ $(id+' span').innerHTML=L[n]; });
+    $('#bY').classList.toggle('ready',k==='i'); $('#bA').classList.toggle('ready',k==='i');
+    $('#bX').classList.toggle('hit',k==='n'); $('#bA').classList.toggle('hit',k==='n');
+  }
+  $('#bY').style.setProperty('--pw',G.charging?clamp(G.chargeT/.55,0,1).toFixed(3):0);
+  $('#bA').classList.toggle('go',G.sprint&&inp.a.down&&k!=='o');
+  const sb=$('#bX'); sb.style.setProperty('--st',G.stam.toFixed(3)); sb.style.setProperty('--sc',G.stamLock?'#e5383e':G.stam<.3?'#ffb020':'#3fd68f');
   sb.classList.toggle('empty',G.stamLock); sb.classList.toggle('go',G.sprint);
 }
 function sndIcon(){ $('#sndIco').innerHTML=A.on?'<path d="M2 6h3l4-3v10l-4-3H2z"/><path d="M11 5.5c1 .7 1.5 1.5 1.5 2.5s-.5 1.8-1.5 2.5" fill="none" stroke="#e9eef2" stroke-width="1.4" stroke-linecap="round"/>':'<path d="M2 6h3l4-3v10l-4-3H2z"/><path d="M11 6l3.5 4M14.5 6L11 10" stroke="#e9eef2" stroke-width="1.4" stroke-linecap="round"/>'; }
@@ -1516,7 +1543,7 @@ function frame(now){
     readMove();
     if(G.phase==='play' && G.home.human) humanActions();
     if(G.phase==='faceoff') faceoffUpdate(dt);
-    if(G.phase==='goal'&&!G.demo&&G.phaseT>1.6&&(inp.pass.pressed||inp.shoot.pressed||inp.taps.length)) G.phaseT=99;
+    if(G.phase==='goal'&&!G.demo&&G.phaseT>1.6&&(inp.x.pressed||inp.y.pressed||inp.a.pressed||inp.b.pressed||inp.taps.length)) G.phaseT=99;
     clearEdges();
     const n=2; for(let i=0;i<n;i++) step(dt/n);
     if(G.home.human && G.ctrl && G.P.owner===G.ctrl) G.passHint=pickPassTarget(G.ctrl,stickV()); else G.passHint=null;
@@ -1632,7 +1659,7 @@ function drawTeams(){
     const ti=cfg[side], t=TEAMS[ti];
     drawPortrait($('#p'+k),ti,side==='home'); drawLogo($('#l'+k),ti);
     $('#n'+k).innerHTML=`${t.city.toUpperCase()}<br>${t.name.toUpperCase()}`;
-    $('#b'+k).innerHTML=[['SHOOT',t.sht],['SKATE',t.spd],['PASS',t.pas],['GOALIE',t.gk]].map(([l,v])=>{ const n=clamp(Math.round((v-.7)/.25*8),1,8); return `<div class="bar"><span>${l}</span><i>${'<b></b>'.repeat(n)}${'<u></u>'.repeat(8-n)}</i></div>`; }).join('');
+    $('#r'+k).innerHTML=[['SHOOT',t.sht],['SKATE',t.spd],['PASS',t.pas],['GOALIE',t.gk]].map(([l,v])=>{ const n=clamp(Math.round((v-.7)/.25*8),1,8); return `<div class="bar"><span>${l}</span><i>${'<b></b>'.repeat(n)}${'<u></u>'.repeat(8-n)}</i></div>`; }).join('');
     $('#side'+k).classList.toggle('active',activeSide===side);
   }
   const cells=$('#cells');
