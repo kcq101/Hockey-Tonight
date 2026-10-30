@@ -630,7 +630,7 @@ function mkP(team,slot,g,ro,def){
   return {team,slot,g,name:ro.name.toUpperCase(),num:ro.num,x:0,y:0,vx:0,vy:0,face:team.dir>0?Math.PI/2:-Math.PI/2,
     down:0,checkCool:0,aiT:rnd(0,.2),weave:rnd(0,6.28),clearCool:0,spray:0,
     spd:clamp(def.spd+v(),.5,1),sht:clamp(def.sht+v(),.5,1)*(slot>=3?.96:1),gk:def.gk,
-    goals:0,assists:0,sog:0,hits:0,saves:0,pokeT:0,pokeCool:0,pokeDone:true,spinT:0,spinDir:1,dekeT:0,wrapT:0,wrapIn:0,behind:false,homeT:0,checkTgt:null,biteX:0,biteT:0,stride:rnd(0,6.28),amp:0,shotT:0,lungeT:0,bfly:0,lo:.35,ro:.35};
+    goals:0,assists:0,sog:0,hits:0,saves:0,passT:0,shotK:'wrist',saveT:0,saveX:0,pokeT:0,pokeCool:0,pokeDone:true,spinT:0,spinDir:1,dekeT:0,wrapT:0,wrapIn:0,behind:false,homeT:0,checkTgt:null,biteX:0,biteT:0,stride:rnd(0,6.28),amp:0,shotT:0,lungeT:0,bfly:0,lo:.35,ro:.35};
 }
 function mkTeam(ti,dir,human,home){
   const def=TEAMS[ti], ro=roster(ti);
@@ -800,7 +800,7 @@ function passTo(from,to){
   tx=clamp(tx,-RW+2,RW+-2); ty=clamp(ty,-RH+3,RH-3);
   let a=Math.atan2(ty-P.y,tx-P.x)+gauss()*.03*(1.25-from.team.def.pas);
   releasePuck(from,Math.cos(a)*spd,Math.sin(a)*spd,.25);
-  P.pass={from,to,t:0}; pushTouch(from);
+  P.pass={from,to,t:0}; pushTouch(from); from.passT=.3;
   if(from.team.human) setCtrl(to);
   A.pass(P.x,P.y);
 }
@@ -824,7 +824,7 @@ function shoot(p,power,aim,oneT){
   }
   p.dekeT=0; p.wrapT=0;
   ang+=gauss()*(.022+(1-acc)*.06+power*.028)/Math.max(.6,acc)*(move==='wrap'?.45:1);
-  releasePuck(p,Math.cos(ang)*spd,Math.sin(ang)*spd,.3); p.shotT=.35;
+  releasePuck(p,Math.cos(ang)*spd,Math.sin(ang)*spd,.3); p.shotT=.35; p.shotK=power>.6||oneT?'slap':'wrist';
   let onNet=false; if(P.vy*dir>0){ const t=(gy-P.y)/P.vy; const xc=P.x+P.vx*t; onNet=Math.abs(xc)<NW; }
   P.shot={by:p,team:p.team,oneT,spd,t:0,onNet,d0:hyp(P.x,gy-P.y),gMove:hyp(g.vx,g.vy),move,wrapCross};
   P.lastMove=move; P.lastMoveBy=p; P.lastMoveT=G.t;
@@ -1051,7 +1051,7 @@ function moveSkater(p,dx,dy,dt){
   const mv=hyp(p.x-ox,p.y-oy);
   p.amp+=(((m>.05&&p.down<=0&&sp>1.5)?clamp(.45+sp/max*.6,0,1):0)-p.amp)*Math.min(1,dt*6);
   p.stride+=mv*.42;
-  if(p.shotT>0) p.shotT-=dt; if(p.lungeT>0) p.lungeT-=dt;
+  if(p.shotT>0) p.shotT-=dt; if(p.lungeT>0) p.lungeT-=dt; if(p.passT>0) p.passT-=dt;
   if(mv>.02 && p.down<=0){
     const ss=Math.sin(p.stride), lo=.32+.5*p.amp*Math.max(0,ss), ro=.32+.5*p.amp*Math.max(0,-ss);
     const nx=-Math.sin(p.face), ny=Math.cos(p.face);
@@ -1079,7 +1079,7 @@ function updGoalie(g,dt){
   const st=Math.min(d,spd*dt); const nx=d?dx/d*st:0, ny2=d?dy/d*st:0;
   g.x+=nx; g.y+=ny2; g.vx=nx/dt; g.vy=ny2/dt;
   const tf=Math.atan2(P.y-g.y,P.x-g.x); let df=tf-g.face; while(df>Math.PI)df-=2*Math.PI; while(df<-Math.PI)df+=2*Math.PI; g.face+=clamp(df,-8*dt,8*dt);
-  if(g.clearCool>0) g.clearCool-=dt;
+  if(g.clearCool>0) g.clearCool-=dt; if(g.saveT>0) g.saveT-=dt;
   const thr=P.shot&&!P.owner&&P.shot.team!==g.team&&hyp(P.x-g.x,P.y-g.y)<30; g.bfly+=((thr?1:0)-g.bfly)*Math.min(1,dt*(thr?14:4));
 }
 function bodies(){
@@ -1116,7 +1116,7 @@ function goalieFree(g,px0,py0){
     pr=clamp(pr,.12,.97);
     if(Math.random()<pr){
       if(sh){ sh.team.shots++; sh.by.sog++; g.saves++; }
-      A.save(g.x,g.y,spd); floatTxt(g.x,g.y-side*3,'SAVE!','#9fd3ff');
+      A.save(g.x,g.y,spd); floatTxt(g.x,g.y-side*3,'SAVE!','#9fd3ff'); g.saveT=.4; g.saveX=P.x;
       if(spd<74 && Math.random()<.55){ freezeBy(g); return true; }
       let vn=P.vx*nx+P.vy*ny; if(vn<0){ P.vx-=2*vn*nx; P.vy-=2*vn*ny; }
       P.vx=P.vx*.38+rnd(-10,10); P.vy=P.vy*.38; if(P.vy*side>-4) P.vy=-side*rnd(6,14);
@@ -1481,7 +1481,7 @@ const BODY=1.35;
 // 3/4 view: bodies are drawn in layers that lift toward the top of the screen by height above the ice.
 // U is the body-local vector for one unit of height (world +y, i.e. screen up, undone through the body's rotation).
 const rotV=(U,a)=>{ const c=Math.cos(a), s=Math.sin(a); return [U[0]*c+U[1]*s, -U[0]*s+U[1]*c]; };
-function drawSkater(p){
+function drawSkaterVec(p){
   const C=teamColors(p);
   const hop=p.celeb&&G.phase==='goal'?Math.abs(Math.sin(G.t*8+p.weave))*.07:0;
   ctx.lineCap='round'; ctx.lineJoin='round';
@@ -1493,6 +1493,89 @@ function drawSkater(p){
   const U=[Math.sin(r)*u,Math.cos(r)*u];
   if(p.g) drawGoalieBody(p,C,U); else drawSkaterBody(p,C,U);
   ctx.restore();
+}
+// ---------------- player sprites ----------------
+// Three separate layers, tunable independently:
+//   1. appearance: a key-coloured frame atlas (tools/build_sprites.py), recoloured per team at game start (buildKit)
+//   2. animation:  pickFrame() turns gameplay state (facing, stride, shot/pass/poke/check timers) into a frame name
+//   3. movement:   untouched - moveSkater()/physics only ever feed the timers pickFrame reads
+// If the atlas hasn't loaded (or fails), drawSkaterVec() draws the old vector players instead.
+const SPR_H=4.75, SPR_GH=5.1;      // on-screen height in world units: skater standing, goalie in his stance
+const SPR={img:null,meta:null,kits:new Map()};
+(function(){ fetch('img/sk/atlas.json').then(r=>r.json()).then(m=>{ const im=new Image(); im.decoding='async';
+  im.onload=()=>{ SPR.meta=m; SPR.img=im; if(G&&!G.demo){ getKit(G.home); getKit(G.away); } }; im.src='img/sk/atlas.webp'; }).catch(()=>{}); })();
+const kitCols=t=>{ const d=t.def; return t.home?[d.c1,d.c2,d.dk]:['#f2f5f8',d.c1,d.dk]; };
+// Recolour key colours, keeping the artist's shading: magenta -> jersey, cyan -> stripes, lime -> helmet/gloves/pants
+function getKit(team){
+  if(!SPR.img) return null;
+  const cols=kitCols(team), key=cols.join(); let k=SPR.kits.get(key); if(k) return k;
+  const im=SPR.img, c=document.createElement('canvas'); c.width=im.width; c.height=im.height;
+  const x=c.getContext('2d',{willReadFrequently:true}); x.drawImage(im,0,0);
+  let id; try{ id=x.getImageData(0,0,c.width,c.height); }catch(e){ return null; }
+  const d=id.data, rgb=cols.map(h=>{ const n=parseInt(h.slice(1),16); return [n>>16,n>>8&255,n&255]; }), REF=[245,240,190];
+  for(let i=0;i<d.length;i+=4){
+    if(d[i+3]<8) continue;
+    const r=d[i],g=d[i+1],b=d[i+2], mx=r>g?(r>b?r:b):(g>b?g:b), mn=r<g?(r<b?r:b):(g<b?g:b);
+    if(mx<40||mx-mn<.38*mx) continue;
+    const dl=mx-mn; let h= mx===r?((g-b)/dl+6)%6 : mx===g?(b-r)/dl+2 : (r-g)/dl+4; h*=60;
+    const cls= h>=242&&h<345?0 : h>=150&&h<242?1 : h>=70&&h<150?2 : -1;   // violet blends between jersey and stripe split at 242
+    if(cls<0) continue;
+    const f=mx/REF[cls], C=rgb[cls];
+    for(let j=0;j<3;j++){ const v=f<=1?C[j]*f:C[j]+(255-C[j])*Math.min(1,(f-1)*1.5); d[i+j]=v>255?255:v; }
+  }
+  x.putImageData(id,0,0);
+  // hand the result to a plain (GPU-friendly) canvas: the read-optimised one above would be re-uploaded every frame
+  const out=document.createElement('canvas'); out.width=c.width; out.height=c.height; out.getContext('2d').drawImage(c,0,0); c.width=c.height=0;
+  if(SPR.kits.size>=4) SPR.kits.clear();      // only two teams play at once; keep memory flat across rematches
+  SPR.kits.set(key,out); return out;
+}
+// facing -> one of 5 drawn directions; the left half of the compass is the right half mirrored
+const SDIR=['E','NE','N','NE','E','SE','S','SE'], SMIR=[0,0,0,1,1,1,0,0], ADIR=['E','E','N','E','E','E','S','E'];
+const dirIdx=a=>((Math.round(a/(Math.PI/4))%8)+8)%8;
+function pickFrame(p){
+  const i=dirIdx(p.face), m=SMIR[i];
+  if(p.g){
+    const k=p.y>0?'S':'N';                     // far net: facing the camera; near net: his back to it
+    let a='g_ready';
+    if(p.saveT>0){ const right=p.saveX>p.x; a=(k==='S')===right?'g_glove':'g_block'; }
+    else if(p.bfly>.55) a='g_fly';
+    return [a+'_'+k,0];
+  }
+  const ad=ADIR[i];
+  if(G.phase==='goal'&&p.celeb) return ['slap_'+ad,m];
+  if(p===G.ctrl&&G.charging&&G.P.owner===p) return ['windup_'+ad,m];
+  if(p.shotT>0) return [(p.shotK||'wrist')+'_'+ad,m];
+  if(p.passT>0) return ['pass_'+ad,m];
+  if(p.pokeT>0) return ['poke_'+ad,m];
+  if(p.lungeT>0||p.homeT>0) return ['check_'+ad,m];
+  if(p.spray>0) return ['stop_'+ad,m];
+  const d=SDIR[i];
+  if(p.amp>.22){
+    if(G.sprint&&p===G.ctrl) return ['accel_'+ad,m];
+    // push frames centred on the stride peaks (the same peaks the skate sound uses): push, glide, push, glide
+    const f=((Math.floor((p.stride-Math.PI/4)/(Math.PI/2))%4)+4)%4;
+    return ['run_'+d+'_'+f,m];
+  }
+  return ['idle_'+d,m];
+}
+function drawSprite(p){
+  const kit=getKit(p.team); if(!kit) return false;
+  const [nm,mir]=pickFrame(p), f=SPR.meta.frames[nm]; if(!f) return false;
+  const {sc,dpr}=view, k=(p.g?SPR_GH:SPR_H)*sc*dpr/(p.g?SPR.meta.hg:SPR.meta.h0);
+  const [sx,sy]=W(p.x,p.y), hop=p.celeb&&G.phase==='goal'?Math.abs(Math.sin(G.t*8+p.weave))*.55*sc*dpr:0;
+  ctx.save(); ctx.setTransform(1,0,0,1,0,0); ctx.imageSmoothingEnabled=true; ctx.imageSmoothingQuality='high';
+  ctx.translate(sx*dpr,sy*dpr+.25*sc*dpr-hop);
+  if(p.down>0) ctx.rotate((p.face>-Math.PI/2&&p.face<Math.PI/2?1:-1)*1.25);   // knocked down: lying on the ice
+  if(mir) ctx.scale(-1,1);
+  ctx.drawImage(kit,f[0],f[1],f[2],f[3],-f[4]*k,-f[3]*k,f[2]*k,f[3]*k);
+  ctx.restore(); return true;
+}
+function drawSkater(p){
+  if(!SPR.meta) return drawSkaterVec(p);
+  ctx.lineCap='round'; ctx.lineJoin='round';
+  blob(p.x+.35,p.y-.2,p.g?2.6:1.85,p.g?1.5:1.05,'#14283f',.42);
+  if(p===G.ctrl && !G.demo){ const pu=Math.sin(G.t*6)*.2; ctx.strokeStyle='rgba(255,176,32,.9)'; ctx.lineWidth=.22; ctx.beginPath(); ctx.ellipse(p.x,p.y,2.6+pu,2+pu,0,0,7); ctx.stroke(); }
+  if(!drawSprite(p)) drawSkaterVec(p);
 }
 function drawSkate(x,y,r){ ctx.save(); ctx.translate(x,y); ctx.rotate(r); ctx.fillStyle='#181c21'; rrect(-.21,-.48,.42,1.02,.18); ctx.fill(); ctx.strokeStyle='#dfe7ee'; ctx.lineWidth=.06; ctx.beginPath(); ctx.moveTo(0,-.62); ctx.lineTo(0,.66); ctx.stroke(); ctx.restore(); }
 const HIP=1.35, TORSO=2.25, HEAD=1.25;
@@ -1650,7 +1733,7 @@ function render(){
   const vg=ctx.createRadialGradient(cw/2,ch/2,Math.min(cw,ch)*.35,cw/2,ch/2,Math.max(cw,ch)*.75); vg.addColorStop(0,'rgba(8,24,44,0)'); vg.addColorStop(1,'rgba(8,24,44,.28)'); ctx.fillStyle=vg; ctx.fillRect(0,0,cw,ch);
   ctx.textAlign='center'; ctx.textBaseline='middle';
   if(!G.demo){
-    if(G.passHint && P.owner===G.ctrl){ const [hx,hy]=W(G.passHint.x,G.passHint.y+4.8); const b=Math.sin(G.t*8)*2; ctx.fillStyle='#5fb8ff'; ctx.beginPath(); ctx.moveTo(hx-6,hy-6+b); ctx.lineTo(hx+6,hy-6+b); ctx.lineTo(hx,hy+2+b); ctx.closePath(); ctx.fill(); }
+    if(G.passHint && P.owner===G.ctrl){ const [hx,hy]=W(G.passHint.x,G.passHint.y+6); const b=Math.sin(G.t*8)*2; ctx.fillStyle='#5fb8ff'; ctx.beginPath(); ctx.moveTo(hx-6,hy-6+b); ctx.lineTo(hx+6,hy-6+b); ctx.lineTo(hx,hy+2+b); ctx.closePath(); ctx.fill(); }
     const lab=new Set([G.ctrl]); if(P.owner) lab.add(P.owner);
     ctx.font='700 11px "Barlow Semi Condensed", "Arial Narrow", sans-serif';
     for(const p of lab){ if(!p) continue; const [lx,ly]=W(p.x,p.y-3.2); const t=`#${p.num} ${p.name}`; const w=ctx.measureText(t).width+10;
@@ -1875,7 +1958,7 @@ function drawOpts(){
 function startGame(){
   A.init(); A.resume();
   for(const id of ['#final','#inter','#pause']) $(id).hidden=true; showScreen(null);
-  newGame(cfg.home,cfg.away,cfg.diff,cfg.len,false);
+  newGame(cfg.home,cfg.away,cfg.diff,cfg.len,false); getKit(G.home); getKit(G.away);
   M.set('game');
   try{ navigator.wakeLock && navigator.wakeLock.request('screen').catch(()=>{}); }catch(e){}
 }

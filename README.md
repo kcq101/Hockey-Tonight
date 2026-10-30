@@ -46,3 +46,9 @@ Keyboard: WASD/arrows; J = top, U = left, K or Space = right, L or Shift = botto
 - Feel tuning (skating speed, checking, scoring rate)
 - Offsides, icing, penalties
 - Online multiplayer against friends
+
+## Player sprites
+Players are drawn from `img/sk/atlas.webp` (+ `atlas.json`), built from the key-colour source art in `art/src/`
+(magenta = jersey, cyan = stripes, lime = helmet/gloves/pants). The game recolours the atlas for the two teams
+at the start of each match. To rebuild after changing the art: `python3 tools/build_sprites.py`
+(needs Pillow, NumPy and SciPy). `art/src/` is never loaded by the game.
