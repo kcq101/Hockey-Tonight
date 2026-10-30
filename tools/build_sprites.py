@@ -19,8 +19,8 @@ from scipy import ndimage
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SRC = os.path.join(ROOT, 'art', 'src')
 OUT = os.path.join(ROOT, 'img', 'sk')
-H0 = 100        # px height of a standing skater in the atlas (~1.2x on-screen size at dpr 2)
-HG = 104        # px height of the goalie in his ready stance
+H0 = 140        # px height of a standing skater in the atlas (sharp at ~70 css px on a 2x screen)
+HG = 146        # px height of the goalie in his ready stance
 
 def load(name): return np.array(Image.open(os.path.join(SRC, name + '.webp')).convert('RGBA'))
 
@@ -124,7 +124,7 @@ for key, row in [('S', gk[0]), ('N', gk[1])]:
 
 # shelf-pack into one atlas
 items = sorted(frames.items(), key=lambda kv: -kv[1][0].height)
-W = 1024; x = y = shelf = 0; place = {}
+W = 1400; x = y = shelf = 0; place = {}
 for name, (im, ax, bl) in items:
     if x + im.width + 2 > W: x = 0; y += shelf + 2; shelf = 0
     place[name] = (x, y); x += im.width + 2; shelf = max(shelf, im.height)

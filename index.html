@@ -596,7 +596,7 @@ const M={el:null,g:null,on:store.get('blb.mus',true),mode:'title',idx:0,cur:null
 // ---------------- canvas & view ----------------
 const stage=$('#stage'), cv=$('#cv'), ctx=cv.getContext('2d');
 const rinkCv=document.createElement('canvas'), trailCv=document.createElement('canvas'), tctx=trailCv.getContext('2d');
-const ZOOM=1.6;
+const ZOOM=2.2;
 // 3/4 "arcade tilt": depth is squashed by TILT, and one unit of height lifts HZ world units up the screen
 // lower 'broadcast' camera: depth x0.72 (~46 deg); heights project at cos(46)/0.72 so boards/nets/players stand taller
 const TILT=.72, HZ=.95, PS=1.5, PSG=1.15, PV=1.6, BH=1.85, GH=4.7, FRONT_Y=-66, FRONT_H=38;
@@ -1714,9 +1714,10 @@ function drawSheen(){
   ctx.restore();
 }
 // Where the puck sits on each sprite's blade, in atlas px from the foot anchor (glide frames; mirrored for the left side).
+// BLADE offsets are in px of a 100 px-tall skater, so they don't depend on the atlas resolution
 const BLADE={S:[-18,-6],SE:[-16,-6],E:[34,-7],NE:[33,-10],N:[51,-23]};
 function bladeWorld(p){
-  const i=dirIdx(visFace(p)), b=BLADE[SDIR[i]], {sc}=view, k=SPR_H*PS*sc/SPR.meta.h0, [sx,sy]=W(p.x,p.y);
+  const i=dirIdx(visFace(p)), b=BLADE[SDIR[i]], {sc}=view, k=SPR_H*PS*sc/100, [sx,sy]=W(p.x,p.y);
   const X=sx+(SMIR[i]?-b[0]:b[0])*k, Y=sy+.25*PS*sc+b[1]*k;
   return [G.camX+(X-view.cw/2-G.sx)/sc, G.cam-(Y-view.ch/2-G.sy)/(sc*TILT)];
 }
