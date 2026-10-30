@@ -341,7 +341,14 @@ function resize(){
   if(G){ const k=rinkScale().toFixed(1)+G.home.def.abbr; if(k!==rinkKey) buildRink(); }
 }
 let rzT=null; const resizeSoon=()=>{ clearTimeout(rzT); rzT=setTimeout(resize,150); };
-const rinkScale=()=>Math.min(view.sc*view.dpr,16);
+const rinkScale=()=>Math.min(view.sc*view.dpr,14);
+// Mobile browsers can silently wipe off-screen canvases (backgrounding, memory pressure). Detect and redraw.
+let rinkCheckT=0;
+function rinkOk(){ try{ if(!rinkCv.width||!rinkCv.height) return false; const d=rinkCv.getContext('2d').getImageData(rinkCv.width>>1,rinkCv.height>>1,1,1).data; return d[3]>0; }catch(e){ return true; } }
+function ensureRink(){ if(G&&!rinkOk()){ buildRink(); clearTrails(); } }
+rinkCv.addEventListener('contextrestored',()=>{ if(G) buildRink(); });
+trailCv.addEventListener('contextrestored',()=>clearTrails());
+document.addEventListener('visibilitychange',()=>{ if(!document.hidden) setTimeout(ensureRink,120); });
 
 // ---------------- game state ----------------
 let G=null, cfg={home:store.get('blb.home',0),away:store.get('blb.away',1),diff:store.get('blb.diff','pro'),len:store.get('blb.len',3)};
@@ -1248,6 +1255,7 @@ function frame(now){
   requestAnimationFrame(frame);
   if(G&&G.demo&&(skip=(skip+1)%2)) return;
   if(document.hidden) { last=now; return; }
+  if(now-rinkCheckT>1000){ rinkCheckT=now; ensureRink(); }
   let dt=Math.min(.05,(now-last)/1000); last=now;
   if(G && !G.paused && G.phase!=='inter' && G.phase!=='final'){
     readMove();
