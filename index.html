@@ -1493,13 +1493,22 @@ const BODY=1.35*PS;
 // 3/4 view: bodies are drawn in layers that lift toward the top of the screen by height above the ice.
 // U is the body-local vector for one unit of height (world +y, i.e. screen up, undone through the body's rotation).
 const rotV=(U,a)=>{ const c=Math.cos(a), s=Math.sin(a); return [U[0]*c+U[1]*s, -U[0]*s+U[1]*c]; };
+// the skater you control: an amber five-point star outline painted on the ice under him, gently pulsing
+function selStar(p,R){
+  const pu=1+Math.sin(G.t*6)*.06, ro=R*pu, ri=ro*.45, sq=.62/TILT;   // sq keeps it lying flat at the same squash as the shadows
+  ctx.beginPath();
+  for(let i=0;i<10;i++){ const a=Math.PI/2+i*Math.PI/5, r=i%2?ri:ro; const x=p.x+Math.cos(a)*r, y=p.y+Math.sin(a)*r*sq; i?ctx.lineTo(x,y):ctx.moveTo(x,y); }
+  ctx.closePath(); ctx.lineJoin='round';
+  ctx.strokeStyle='rgba(10,16,23,.45)'; ctx.lineWidth=.42; ctx.stroke();      // dark edge so it reads on white ice
+  ctx.strokeStyle='rgba(255,176,32,.95)'; ctx.lineWidth=.24; ctx.stroke();
+}
 function drawSkaterVec(p){
   const C=teamColors(p);
   const hop=p.celeb&&G.phase==='goal'?Math.abs(Math.sin(G.t*8+p.weave))*.07:0;
   ctx.lineCap='round'; ctx.lineJoin='round';
   blob(p.x,p.y-(p.g?2.8:2.6),p.g?2.3:1.7,p.g?3.2:2.9,p.team.home?p.team.def.c1:'#ffffff',p.team.home?.2:.28);
   blob(p.x+.9,p.y-.7,p.g?3.2:2.6,p.g?2.3:1.8,'#14283f',.36);
-  if(p===G.ctrl && !G.demo){ const pu=Math.sin(G.t*6)*.2; ctx.strokeStyle='rgba(255,176,32,.9)'; ctx.lineWidth=.22; ctx.beginPath(); ctx.ellipse(p.x,p.y,3.1+pu,2.8+pu,0,0,7); ctx.stroke(); }
+  if(p===G.ctrl && !G.demo) selStar(p,3.4);
   const r=p.face-Math.PI/2, k=BODY*(1+hop), u=(p.down>0&&!p.g?.12:1)*HZ/k;
   ctx.save(); ctx.translate(p.x,p.y); ctx.rotate(r); ctx.scale(k,k);
   const U=[Math.sin(r)*u,Math.cos(r)*u];
@@ -1588,7 +1597,7 @@ function drawSkater(p){
   if(!SPR.meta) return drawSkaterVec(p);
   ctx.lineCap='round'; ctx.lineJoin='round';
   { const q=p.g?PSG:PS; blob(p.x+.35*q,p.y-.2*q,(p.g?2.6:1.85)*q,(p.g?1.5:1.05)*q/TILT*.8,'#14283f',.42); }
-  if(p===G.ctrl && !G.demo){ const pu=Math.sin(G.t*6)*.2; ctx.strokeStyle='rgba(255,176,32,.9)'; ctx.lineWidth=.22; ctx.beginPath(); ctx.ellipse(p.x,p.y,(2.6+pu)*PS,(2+pu)*PS/TILT*.8,0,0,7); ctx.stroke(); }
+  if(p===G.ctrl && !G.demo) selStar(p,3.1*PS);
   if(G.P.owner===p && p!==G.ctrl && !G.demo){ ctx.strokeStyle=hexA(p.team.def.c1,.85); ctx.lineWidth=.2; ctx.beginPath(); ctx.ellipse(p.x,p.y,2.4*PS,1.85*PS/TILT*.8,0,0,7); ctx.stroke(); }
   if(!drawSprite(p)) drawSkaterVec(p);
 }
