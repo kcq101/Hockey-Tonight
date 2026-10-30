@@ -6,7 +6,7 @@ Source art uses key colors so one atlas serves every team:
 The game recolors the atlas for the two teams in each match (see buildKit in index.html).
 
 Output: img/sk/atlas.webp + img/sk/atlas.json
-  frames: name -> [x, y, w, h, ax]   (ax = foot anchor x in px; the feet sit on the bottom edge)
+  frames: name -> [x, y, w, h, ax, bx, by]   (ax = foot anchor x; feet on the bottom edge; bx,by = puck point on the blade)
   h0: height in px of a normal standing skater (the renderer scales from this)
 
 Run:  python3 tools/build_sprites.py
@@ -62,12 +62,26 @@ def trim(sub):
 
 def height(sub): return trim(sub).shape[0]
 
+def blade(sub, ax):
+    """Where the puck sits on the stick: the largest bright-white tape blob that isn't skate steel.
+    Skate blades are the white bits low down near the feet, so those are skipped."""
+    h, w = sub.shape[:2]; rgb = sub[..., :3].astype(float); mx = rgb.max(-1); mn = rgb.min(-1)
+    white = (mx > 215) & ((mx - mn) < .14 * mx) & (sub[..., 3] > 200); white[:int(h * .45)] = False
+    lab, n = ndimage.label(ndimage.binary_closing(white, iterations=2)); best = None
+    for i in range(n):
+        ys, xs = np.nonzero(lab == i + 1)
+        if len(ys) < 30: continue
+        cy, cx = ys.mean() / h, xs.mean() / w
+        if cy > .78 and abs(cx - ax) < .3: continue          # skate steel under the feet
+        if best is None or len(ys) > best[0]: best = (len(ys), cx, cy)
+    return (best[1], best[2]) if best else None
+
 def fit(sub, scale):
-    """Trim, scale, and find the foot anchor (centre of the skates in the lowest 12%)."""
+    """Trim, scale, find the foot anchor (centre of the skates in the lowest 12%) and the puck point on the blade."""
     sub = trim(sub); h, w = sub.shape[:2]
-    low = sub[int(h * .88):, :, 3] > 40; fx = np.nonzero(low.any(0))[0]
+    low = sub[int(h * .88):, :, 3] > 40; fx = np.nonzero(low.any(0))[0]; ax = (fx.min() + fx.max()) / 2 / w
     im = Image.fromarray(sub).resize((max(1, round(w * scale)), max(1, round(h * scale))), Image.LANCZOS)
-    return im, (fx.min() + fx.max()) / 2 / w
+    return im, ax, blade(sub, ax)
 
 def ref_height(frames, n=None):
     """Upright reference height for a sheet: median of its shortest figures (ignores raised sticks)."""
@@ -111,15 +125,17 @@ for key, row in [('S', gk[0]), ('N', gk[1])]:
 # shelf-pack into one atlas
 items = sorted(frames.items(), key=lambda kv: -kv[1][0].height)
 W = 1024; x = y = shelf = 0; place = {}
-for name, (im, ax) in items:
+for name, (im, ax, bl) in items:
     if x + im.width + 2 > W: x = 0; y += shelf + 2; shelf = 0
     place[name] = (x, y); x += im.width + 2; shelf = max(shelf, im.height)
 H = y + shelf
 atlas = Image.new('RGBA', (W, H))
 meta = {'h0': H0, 'hg': HG, 'frames': {}}
-for name, (im, ax) in frames.items():
+for name, (im, ax, bl) in frames.items():
     px, py = place[name]; atlas.alpha_composite(im, (px, py))
-    meta['frames'][name] = [px, py, im.width, im.height, round(ax * im.width, 1)]
+    # [x, y, w, h, foot-x, blade-x, blade-y]  (blade point in frame px; -1 when no blade is on the ice)
+    b = [round(bl[0] * im.width, 1), round(bl[1] * im.height, 1)] if bl else [-1, -1]
+    meta['frames'][name] = [px, py, im.width, im.height, round(ax * im.width, 1)] + b
 os.makedirs(OUT, exist_ok=True)
 # a 256-colour palette keeps every key hue intact (checked: recoloured output is indistinguishable) at ~1/4 the size
 atlas = atlas.quantize(colors=256, method=Image.Quantize.FASTOCTREE).convert('RGBA')

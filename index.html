@@ -643,7 +643,7 @@ function newGame(hi,ai,diff,len,demo=false){
   G={home:mkTeam(hi,1,!demo,true),away:mkTeam(ai,-1,false,false),D:DIFF[diff],diff,perLen:len*60,period:1,clock:len*60,t:0,
     phase:'faceoff',phaseT:0,demo,paused:false,
     P:{x:0,y:0,vx:0,vy:0,owner:null,pass:null,shot:null,beat:null,pickBlock:null,pickBlockT:0,noPickT:0,tried:new Set(),touches:[],frozen:false},
-    ctrl:null,cam:0,camX:0,shake:0,parts:[],floats:[],charging:false,chargeT:0,spinAcc:0,spinA:null,oneTLate:0,stam:1,stamLock:false,stamIdle:0,sprint:false,oneT:0,foDropped:false,foPress:null,foHints:0,chaser:[null,null],passHint:null,foSpot:{x:0,y:0}};
+    ctrl:null,cam:0,camX:0,shake:0,parts:[],floats:[],fx:[],charging:false,chargeT:0,spinAcc:0,spinA:null,oneTLate:0,stam:1,stamLock:false,stamIdle:0,sprint:false,oneT:0,foDropped:false,foPress:null,foHints:0,chaser:[null,null],passHint:null,foSpot:{x:0,y:0}};
   G.home.opp=G.away; G.away.opp=G.home;
   buildRink(); clearTrails(); startFaceoff({x:0,y:0}); updateSB(true);
 }
@@ -829,6 +829,7 @@ function shoot(p,power,aim,oneT){
   P.shot={by:p,team:p.team,oneT,spd,t:0,onNet,d0:hyp(P.x,gy-P.y),gMove:hyp(g.vx,g.vy),move,wrapCross};
   P.lastMove=move; P.lastMoveBy=p; P.lastMoveT=G.t;
   P.pass=null; pushTouch(p);
+  fx(P.x,P.y,'flash','#ffffff',1.2+power*1.2,.22); if(power>.6||oneT) fx(P.x,P.y,'burst','#ffffff',2.6+power,.3);
   A.shot(power,P.x,P.y); if(power>.75) G.shake=Math.max(G.shake,.18);
   if(oneT) floatTxt(p.x,p.y+3,'ONE-TIMER!','#ffb020');
   else if(move==='wrap') floatTxt(p.x,p.y+3,'WRAPAROUND!','#ffb020');
@@ -850,6 +851,7 @@ function applyHit(c,v){
   const s=clamp(hyp(c.vx,c.vy)/30,.25,1.2), dx=(v.x-c.x)/vd, dy=(v.y-c.y)/vd;
   v.down=.8+s*.7; v.vx+=dx*(9+s*12); v.vy+=dy*(9+s*12); c.vx*=.5; c.vy*=.5;
   if(G.P.owner===v) releasePuck(v,v.vx*.6+rnd(-10,10),v.vy*.6+rnd(-10,10),.4);
+  fx(v.x,v.y,'burst','#ff6b5a',3+s*1.5); fx(v.x,v.y,'ring','#ff6b5a',3.2+s);
   c.team.hits++; c.hits++; A.check(s,v.x,v.y); G.shake=Math.max(G.shake,.15+.3*s);
   for(let i=0;i<8;i++) G.parts.push({x:v.x,y:v.y,vx:rnd(-12,12),vy:rnd(-12,12),l:rnd(.3,.6)});
   if(s>.8) floatTxt(v.x,v.y+3,'BIG HIT!','#ff6b5a');
@@ -895,7 +897,7 @@ function resolvePoke(c){
     if(Math.random()<pr){
       const lat=rnd(-.6,.6);
       releasePuck(o,(fx*14-fy*lat*10)*.65,(fy*14+fx*lat*10)*.65,.45);
-      floatTxt(P.x,P.y+3,'POKE!','#c49bff'); A.poke(P.x,P.y); if(c.team.human||o.team.human) buzz(15);
+      floatTxt(P.x,P.y+3,'POKE!','#c49bff'); A.poke(P.x,P.y); fx(P.x,P.y,'ring','#c49bff',2.6); if(c.team.human||o.team.human) buzz(15);
     } else A.poke(P.x,P.y);
   } else if(!o){
     P.vx=P.vx*.2-fx*6; P.vy=P.vy*.2-fy*6; P.pass=null; P.shot=null; P.pickBlock=null; A.poke(P.x,P.y);
@@ -1116,7 +1118,7 @@ function goalieFree(g,px0,py0){
     pr=clamp(pr,.12,.97);
     if(Math.random()<pr){
       if(sh){ sh.team.shots++; sh.by.sog++; g.saves++; }
-      A.save(g.x,g.y,spd); floatTxt(g.x,g.y-side*3,'SAVE!','#9fd3ff'); g.saveT=.4; g.saveX=P.x;
+      A.save(g.x,g.y,spd); floatTxt(g.x,g.y-side*3,'SAVE!','#9fd3ff'); fx(P.x,P.y,'burst','#9fd3ff',3); fx(P.x,P.y,'flash','#ffffff',1.6,.2); g.saveT=.4; g.saveX=P.x;
       if(spd<74 && Math.random()<.55){ freezeBy(g); return true; }
       let vn=P.vx*nx+P.vy*ny; if(vn<0){ P.vx-=2*vn*nx; P.vy-=2*vn*ny; }
       P.vx=P.vx*.38+rnd(-10,10); P.vy=P.vy*.38; if(P.vy*side>-4) P.vy=-side*rnd(6,14);
@@ -1219,7 +1221,7 @@ function updPuck(dt){
           ok=Math.random()<(P.shot?.12:.42)*(s===G.ctrl?1.3:1);
           if(!ok && P.shot && body<SR+PR+.4 && s.team!==P.shot.team){
             const a=Math.atan2(P.vy,P.vx)+Math.PI+rnd(-1.4,1.4), v=hyp(P.vx,P.vy)*.3;
-            P.vx=Math.cos(a)*v; P.vy=Math.sin(a)*v; P.shot=null; A.block(s.x,s.y); floatTxt(s.x,s.y+3,'BLOCKED','#cfe3ff');
+            P.vx=Math.cos(a)*v; P.vy=Math.sin(a)*v; P.shot=null; A.block(s.x,s.y); floatTxt(s.x,s.y+3,'BLOCKED','#cfe3ff'); fx(s.x,s.y,'burst','#cfe3ff',2.8);
           }
         }
         if(ok){ receive(s); break; }
@@ -1228,7 +1230,9 @@ function updPuck(dt){
   }
 }
 function receive(s){
-  const P=G.P, wasPass=P.pass&&P.pass.to===s;
+  const P=G.P, wasPass=P.pass&&P.pass.to===s, picked=P.pass&&P.pass.from.team!==s.team&&!s.g;
+  if(wasPass&&!picked) fx(s.x,s.y,'ring','#5fb8ff',2.8);
+  if(picked){ fx(s.x,s.y,'burst','#ffb020',3.2); fx(s.x,s.y,'ring','#ffb020',3.4); floatTxt(s.x,s.y+3,'PICKED OFF','#ffb020'); }
   setOwner(s);
   if(s===G.ctrl && wasPass && (G.oneT>0||((inp.a.down||inp.y.down)&&!G.charging))){ G.oneT=0; shoot(s,.92,null,true); return; }
   A.catch(P.x,P.y);
@@ -1458,6 +1462,7 @@ function step(dt){
   G.parts=G.parts.filter(q=>q.l>0);
   for(const f of G.floats){ f.l-=dt; f.y+=dt*4; }
   G.floats=G.floats.filter(f=>f.l>0);
+  for(const f of G.fx) f.t+=dt; G.fx=G.fx.filter(f=>f.t<f.d);
   // camera
   const P=G.P, F=(G.phase==='goal'&&G.cele)?{x:G.cele.x,y:G.cele.y,vx:0,vy:0}:P, tgt=F.y+clamp(F.vy*.22,-12,12)-view.ctlH*.5/(view.sc*TILT), tgx=F.x+clamp(F.vx*.15,-6,6);
   const k=Math.min(1,dt*5); G.cam+=(tgt-G.cam)*k; G.camX+=(tgx-G.camX)*k;
@@ -1556,7 +1561,8 @@ function pickFrame(p){
     const f=((Math.floor((p.stride-Math.PI/4)/(Math.PI/2))%4)+4)%4;
     return ['run_'+d+'_'+f,m];
   }
-  return ['idle_'+d,m];
+  // a puck carrier stays in his skating stance (stick on the ice), even when stopped
+  return [(G.P.owner===p?'run_'+d+'_1':'idle_'+d),m];
 }
 function drawSprite(p){
   const kit=getKit(p.team); if(!kit) return false;
@@ -1575,6 +1581,7 @@ function drawSkater(p){
   ctx.lineCap='round'; ctx.lineJoin='round';
   blob(p.x+.35,p.y-.2,p.g?2.6:1.85,p.g?1.5:1.05,'#14283f',.42);
   if(p===G.ctrl && !G.demo){ const pu=Math.sin(G.t*6)*.2; ctx.strokeStyle='rgba(255,176,32,.9)'; ctx.lineWidth=.22; ctx.beginPath(); ctx.ellipse(p.x,p.y,2.6+pu,2+pu,0,0,7); ctx.stroke(); }
+  if(G.P.owner===p && p!==G.ctrl && !G.demo){ ctx.strokeStyle=hexA(p.team.def.c1,.85); ctx.lineWidth=.2; ctx.beginPath(); ctx.ellipse(p.x,p.y,2.4,1.85,0,0,7); ctx.stroke(); }
   if(!drawSprite(p)) drawSkaterVec(p);
 }
 function drawSkate(x,y,r){ ctx.save(); ctx.translate(x,y); ctx.rotate(r); ctx.fillStyle='#181c21'; rrect(-.21,-.48,.42,1.02,.18); ctx.fill(); ctx.strokeStyle='#dfe7ee'; ctx.lineWidth=.06; ctx.beginPath(); ctx.moveTo(0,-.62); ctx.lineTo(0,.66); ctx.stroke(); ctx.restore(); }
@@ -1698,17 +1705,45 @@ function drawSheen(){
   }
   ctx.restore();
 }
+// Where the puck sits on each sprite's blade, in atlas px from the foot anchor (glide frames; mirrored for the left side).
+const BLADE={S:[-18,-6],SE:[-16,-6],E:[34,-7],NE:[33,-10],N:[51,-23]};
+function bladeWorld(p){
+  const i=dirIdx(p.face), b=BLADE[SDIR[i]], {sc}=view, k=SPR_H*sc/SPR.meta.h0, [sx,sy]=W(p.x,p.y);
+  const X=sx+(SMIR[i]?-b[0]:b[0])*k, Y=sy+.25*sc+b[1]*k;
+  return [G.camX+(X-view.cw/2-G.sx)/sc, G.cam-(Y-view.ch/2-G.sy)/(sc*TILT)];
+}
+const PD={off:[0,0]};
 function drawPuck(P){
   const sp=hyp(P.vx,P.vy), lift=G.phase==='faceoff'&&!G.foDropped?clamp(1-G.phaseT/.95,0,1)*2.2:0;
+  // a carried puck rides the blade of the sprite; once released it eases back onto its real position
+  let px=P.x, py=P.y; const o=P.owner;
+  if(o&&!o.g&&o.down<=0&&SPR.meta){ const [bx,by]=bladeWorld(o); PD.off=[bx-P.x,by-P.y]; px=bx; py=by; }
+  else { PD.off[0]*=.78; PD.off[1]*=.78; px+=PD.off[0]; py+=PD.off[1]; }
   // hard shots ride up off the ice (visual only)
-  const sh=!P.owner&&P.shot, z=(sh&&sh.spd>80?clamp((sh.spd-80)/32,0,1)*1.7*Math.sin(Math.PI*clamp(sh.t/.4,0,1)):0)+lift*1.3, zy=z*HZ;
-  if(!P.owner&&sp>40){ ctx.lineCap='round'; for(let i=1;i<=4;i++){ ctx.strokeStyle=`rgba(30,40,55,${.12/i})`; ctx.lineWidth=.9-i*.12; ctx.beginPath(); ctx.moveTo(P.x,P.y+zy); ctx.lineTo(P.x-P.vx*.018*i,P.y+zy-P.vy*.018*i); ctx.stroke(); } }
-  blob(P.x+.3+z*.25,P.y-.3,.8+z*.15,.65+z*.1,'#14283f',.45-z*.1);
-  const r=.55+z*.05, y=P.y+zy;
-  ctx.fillStyle='#202327'; ctx.beginPath(); ctx.ellipse(P.x,y-.12,r,r*.9,0,0,7); ctx.fill();
-  ctx.fillStyle='#0c0d0f'; ctx.beginPath(); ctx.arc(P.x,y,r,0,7); ctx.fill();
-  ctx.strokeStyle='rgba(255,255,255,.28)'; ctx.lineWidth=.08; ctx.beginPath(); ctx.arc(P.x,y,r*.72,Math.PI*.55,Math.PI*1.05); ctx.stroke();
-  ctx.strokeStyle='#2c2f33'; ctx.lineWidth=.07; ctx.beginPath(); ctx.arc(P.x,y,r,0,7); ctx.stroke();
+  const sh=!o&&P.shot, z=(sh&&sh.spd>80?clamp((sh.spd-80)/32,0,1)*1.7*Math.sin(Math.PI*clamp(sh.t/.4,0,1)):0)+lift*1.3, zy=z*HZ, y=py+zy;
+  if(!o&&sp>40){
+    blob(px,y,1.6,1.6,'#ffffff',clamp((sp-40)/60,0,.55));       // soft glow so a fast puck stays visible in traffic
+    ctx.lineCap='round'; for(let i=1;i<=4;i++){ ctx.strokeStyle=`rgba(30,40,55,${.14/i})`; ctx.lineWidth=.9-i*.12; ctx.beginPath(); ctx.moveTo(px,y); ctx.lineTo(px-P.vx*.02*i,y-P.vy*.02*i); ctx.stroke(); }
+  }
+  blob(px+.25+z*.25,py-.22,.62+z*.15,.5+z*.1,'#14283f',.45-z*.1);
+  const r=.42+z*.05;
+  ctx.fillStyle='rgba(255,255,255,.92)'; ctx.beginPath(); ctx.ellipse(px,y-.04,r+.14,(r+.14)*.95,0,0,7); ctx.fill();   // light rim: reads against skates and shadows
+  ctx.fillStyle='#202327'; ctx.beginPath(); ctx.ellipse(px,y-.12,r,r*.9,0,0,7); ctx.fill();
+  ctx.fillStyle='#0c0d0f'; ctx.beginPath(); ctx.arc(px,y,r,0,7); ctx.fill();
+  ctx.strokeStyle='rgba(255,255,255,.3)'; ctx.lineWidth=.08; ctx.beginPath(); ctx.arc(px,y,r*.72,Math.PI*.55,Math.PI*1.05); ctx.stroke();
+}
+// ---------------- feedback effects ----------------
+// short world-space rings/bursts for passes, interceptions, shots, hits, saves, pokes and blocks
+function fx(x,y,kind,col,r=3,d=.38){ if(G.demo) return; G.fx.push({x,y,kind,col,r,d,t:0}); if(G.fx.length>24) G.fx.shift(); }
+function drawFx(){
+  for(const f of G.fx){
+    const e=clamp(f.t/f.d,0,1), ee=1-(1-e)*(1-e), al=1-e;
+    ctx.strokeStyle=f.col; ctx.fillStyle=f.col; ctx.lineCap='round';
+    if(f.kind==='ring'){ ctx.globalAlpha=al*.9; ctx.lineWidth=.32*(1-e*.5); ctx.beginPath(); ctx.ellipse(f.x,f.y,f.r*(.35+.65*ee),f.r*(.35+.65*ee)*.8,0,0,7); ctx.stroke(); }
+    else if(f.kind==='burst'){ ctx.globalAlpha=al; ctx.lineWidth=.26; ctx.beginPath(); for(let i=0;i<8;i++){ const a=i*Math.PI/4+.39, r0=f.r*(.25+.5*ee), r1=f.r*(.55+.6*ee); ctx.moveTo(f.x+Math.cos(a)*r0,f.y+Math.sin(a)*r0*.85); ctx.lineTo(f.x+Math.cos(a)*r1,f.y+Math.sin(a)*r1*.85); } ctx.stroke(); }
+    else if(f.kind==='flash'){ blob(f.x,f.y,f.r*(.6+.6*ee),f.r*(.6+.6*ee),f.col,al*.8); }
+  }
+  ctx.globalAlpha=1;
 }
 function render(){
   const {cw,ch,sc,dpr}=view;
@@ -1722,9 +1757,10 @@ function render(){
   const P=G.P;
   if(G.phase==='goal'&&G.cele){ const sd=G.cele.side, pulse=.5+.5*Math.sin(G.t*13); blob(0,sd*(GL+ND+3),13,8,'#ff2020',.25+.4*pulse); blob(0,sd*(GL+1),9,6,'#ff4040',.12+.22*pulse); ctx.fillStyle=pulse>.5?'#ff3030':'#9a1010'; rrect(-1.6,sd*(RH+.6)+GH*HZ-.2,3.2,1,.3); ctx.fill(); }
   // far-to-near so nearer bodies overlap farther ones; nets and the puck sort in with the players
-  const list=skaters().concat([G.home.goalie,G.away.goalie]); list.push({net:1,y:GL},{net:-1,y:-GL},{puck:true,y:P.y});
+  const list=skaters().concat([G.home.goalie,G.away.goalie]); list.push({net:1,y:GL},{net:-1,y:-GL},{puck:true,y:P.owner?P.owner.y-.05:P.y});
   list.sort((a,b)=>b.y-a.y);
   for(const p of list){ if(p.net) drawNet(p.net); else if(p.puck) drawPuck(P); else drawSkater(p); }
+  drawFx();
   const fy=ch/2+(G.cam-FRONT_Y)*sc*TILT+G.sy;
   if(fy<ch){ ctx.setTransform(dpr,0,0,dpr,0,0); ctx.drawImage(rinkFrontCv,x0,fy,94*sc,FRONT_H*sc*TILT); wt(); }
   for(const q of G.parts){ ctx.fillStyle=`rgba(245,250,255,${clamp(q.l*1.5,0,.85)})`; ctx.beginPath(); ctx.arc(q.x,q.y,.14+q.l*.12,0,7); ctx.fill(); }
