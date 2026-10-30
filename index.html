@@ -378,8 +378,8 @@ function newGame(hi,ai,diff,len,demo=false){
   buildRink(); clearTrails(); startFaceoff({x:0,y:0}); updateSB(true);
 }
 const skaters=()=>G.home.players.concat(G.away.players);
-const SKATE_PACE=.8; // skating speed for every skater (you, teammates, CPU); 1 = original
-const maxSpd=p=>SKATE_PACE*(23+p.spd*9)*(p.team.human?1:(G.demo?1:G.D.spd))*(G.sprint&&p===G.ctrl?1.3:1);
+const SKATE_PACE=.9; // skating speed for every skater (you, teammates, CPU); 1 = original
+const maxSpd=p=>SKATE_PACE*(23+p.spd*9)*(p.team.human?1:(G.demo?1:G.D.spd))*(G.sprint&&p===G.ctrl?1.45:1);
 
 // ---------------- rink render ----------------
 function rrPath(c,w,h,r){ c.beginPath(); c.moveTo(-w+r,-h); c.lineTo(w-r,-h); c.arc(w-r,-h+r,r,-Math.PI/2,0); c.lineTo(w,h-r); c.arc(w-r,h-r,r,0,Math.PI/2); c.lineTo(-w+r,h); c.arc(-w+r,h-r,r,Math.PI/2,Math.PI); c.lineTo(-w,-h+r); c.arc(-w+r,-h+r,r,Math.PI,Math.PI*1.5); c.closePath(); }
@@ -663,7 +663,7 @@ function moveSkater(p,dx,dy,dt){
   const max=maxSpd(p)*(G.P.owner===p?.93:1), sp=hyp(p.vx,p.vy);
   if(m>.05){
     if(sp>13 && (p.vx*dx+p.vy*dy)/sp<-.35){ p.spray=.15; if(Math.random()<.5) G.parts.push({x:p.x+p.vx*.06,y:p.y+p.vy*.06,vx:p.vx*.4+rnd(-6,6),vy:p.vy*.4+rnd(-6,6),l:rnd(.25,.5)}); }
-    let ax=dx*max-p.vx, ay=dy*max-p.vy; const al=hyp(ax,ay), acc=52*SKATE_PACE*dt*(G.sprint&&p===G.ctrl?1.5:1); if(al>acc){ax*=acc/al;ay*=acc/al;}
+    let ax=dx*max-p.vx, ay=dy*max-p.vy; const al=hyp(ax,ay), acc=52*SKATE_PACE*dt*(G.sprint&&p===G.ctrl?2:1); if(al>acc){ax*=acc/al;ay*=acc/al;}
     p.vx+=ax; p.vy+=ay;
   } else if(sp>0){ const ns=Math.max(0,sp-(p.down>0?20:13)*dt); p.vx*=ns/sp; p.vy*=ns/sp; }
   p.x+=p.vx*dt; p.y+=p.vy*dt;
@@ -1008,7 +1008,7 @@ function step(dt){
   const canGo=G.home.human&&G.ctrl&&G.ctrl.down<=0&&(G.phase==='play'||G.phase==='goal')&&hyp(inp.mx,inp.my)>.2;
   G.sprint=!!(canGo&&inp.speed.down&&!G.stamLock&&G.stam>0);
   if(G.sprint){ G.stam=Math.max(0,G.stam-dt/2.6); G.stamIdle=0; if(G.stam<=0) G.stamLock=true;
-    if(Math.random()<dt*14){ const c=G.ctrl; G.parts.push({x:c.x-c.vx*.05,y:c.y-c.vy*.05,vx:-c.vx*.15+rnd(-4,4),vy:-c.vy*.15+rnd(-4,4),l:rnd(.2,.4)}); } }
+    if(Math.random()<dt*22){ const c=G.ctrl; G.parts.push({x:c.x-c.vx*.05,y:c.y-c.vy*.05,vx:-c.vx*.15+rnd(-4,4),vy:-c.vy*.15+rnd(-4,4),l:rnd(.2,.4)}); } }
   else { G.stamIdle+=dt; if(G.stamIdle>.5) G.stam=Math.min(1,G.stam+dt/4.5); if(G.stamLock&&G.stam>=.3) G.stamLock=false; }
   const ph=G.phase, live=ph==='play';
   if(live) computeChasers();
