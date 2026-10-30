@@ -1,4 +1,4 @@
-# Hockey Tonight — Blue Line Blitz
+# Hockey Tonight
 
 Arcade 5-on-5 hockey in the spirit of NHL '94, built for phones. Top-down vertical rink, one-timers, big hits, speed bursts, and an original soundtrack.
 
@@ -35,6 +35,7 @@ Keyboard: WASD/arrows, J pass, K shoot, U spin/poke, L or Shift speed, P pause.
 
 - `index.html` — the whole game (HTML, CSS, JavaScript; no build step)
 - `music/` — soundtrack (The Stanley Cup, Arcade Groove, Rink Bounce)
+- `img/` — title screen art and the team-select backdrop
 - `icons/`, `manifest.webmanifest` — home-screen app setup
 
 ## Roadmap

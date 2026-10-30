@@ -1,6 +1,6 @@
 {
-  "name": "Blue Line Blitz",
-  "short_name": "Blitz",
+  "name": "Hockey Tonight",
+  "short_name": "Hockey Tonight",
   "description": "Arcade 5-on-5 hockey in the spirit of NHL '94, built for phones.",
   "start_url": "./",
   "scope": "./",
