@@ -1621,7 +1621,10 @@ $('#bNew').onclick=()=>{ activeSide='home'; toMenu('#teams'); };
 $('#bSnd').onclick=()=>{ A.init(); A.setOn(!A.on); sndIcon(); M.apply(false); };
 function musLbl(){ $('#bMus').textContent='Music: '+(M.on?'On':'Off'); }
 $('#bMus').onclick=()=>{ A.init(); M.setOn(!M.on); musLbl(); };
-document.addEventListener('pointerdown',()=>{ if(!A.ctx){ A.init(); M.apply(false); } else if(M.el&&M.el.paused&&M.level()>0){ M.apply(false); } },true);
+// Phones only allow audio to start from a completed tap (touchend/click), not from the initial touch,
+// so try on every kind of gesture until the music is actually playing.
+function unlockAudio(){ A.init(); A.resume(); if(M.el&&!M.el.paused) return; if(M.level()>0) M.apply(false); }
+for(const ev of ['pointerdown','pointerup','touchend','click','keydown']) document.addEventListener(ev,unlockAudio,{capture:true,passive:true});
 document.addEventListener('visibilitychange',()=>{ if(!M.el) return; if(document.hidden) M.el.pause(); else if(M.level()>0) M.apply(false); });
 document.addEventListener('visibilitychange',()=>{ if(document.hidden) togglePause(true); });
 addEventListener('resize',resizeSoon);
