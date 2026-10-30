@@ -17,12 +17,19 @@ Launching from the home-screen icon runs the game full-screen.
 |---|---|---|
 | Left stick | Skate | Skate |
 | Pass | Tap to pass, swipe to aim at a teammate | Switch player |
-| Shoot | Tap for a wrister, hold for a slapper, swipe to pick a corner | Body check |
+| Shoot | Tap for a wrister, hold for a slapper, swipe to pick a corner | Check: locks onto the nearest opponent and drives through him |
+| Spin / Poke | Spin-o-rama | Poke check: stick reaches out to knock the puck loose |
 | Speed | Hold for a burst (uses stamina) | Same |
 
-Press Shoot while a pass is on its way for a one-timer. Tap a teammate on the ice to pass to him.
+### Scoring moves
 
-Keyboard: WASD/arrows, J pass, K shoot, L or Shift speed, P pause.
+- **One-timer:** press Shoot while a pass is on its way (the button glows "1-TIMER"). Cross-ice one-timers are hardest to stop.
+- **Spin-o-rama:** circle the stick a full turn while carrying (or tap Spin). A goalie nearby bites; shoot right after and it goes to the open side.
+- **Wraparound:** carry it behind the net and come out the other side. The game pulls you tight to the post; shoot right away to stuff it in.
+
+Tap a teammate on the ice to pass to him.
+
+Keyboard: WASD/arrows, J pass, K shoot, U spin/poke, L or Shift speed, P pause.
 
 ## Project layout
 

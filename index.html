@@ -86,11 +86,15 @@ button:focus-visible{outline:2px solid var(--led);outline-offset:2px}
 #bPass{--ring:var(--ice);width:82px;height:82px;left:3%;bottom:10%}
 #bShoot{--ring:var(--led);width:104px;height:104px;right:4%;top:3%}
 #bSpd{--ring:#3fd68f;width:60px;height:60px;right:5%;bottom:9%}
+#bPoke{--ring:#c49bff;width:62px;height:62px;left:4%;top:4%}
+#bPoke span{font-size:12px}
+#bShoot.ready{animation:rdy .45s ease-in-out infinite alternate}
+@keyframes rdy{to{box-shadow:inset 0 0 0 3px var(--ring),0 0 0 4px rgba(255,176,32,.35),0 0 24px rgba(255,176,32,.85)}}
 #bSpd span{font-size:12px}
 #bSpd::before{content:"";position:absolute;inset:-6px;border-radius:50%;background:conic-gradient(var(--sc,#3fd68f) calc(var(--st,1)*1turn),rgba(255,255,255,.08) 0);
   -webkit-mask:radial-gradient(farthest-side,transparent calc(100% - 5px),#000 calc(100% - 4px));mask:radial-gradient(farthest-side,transparent calc(100% - 5px),#000 calc(100% - 4px))}
 #bSpd.empty{opacity:.55}
-@media (max-height:720px){#bShoot{width:92px;height:92px}#bPass{width:74px;height:74px}#bSpd{width:56px;height:56px}.act span{font-size:14px}#bSpd span{font-size:11px}#stickBase{transform:scale(.9)}}
+@media (max-height:720px){#bShoot{width:92px;height:92px}#bPass{width:74px;height:74px}#bSpd{width:56px;height:56px}#bPoke{width:56px;height:56px}#bPoke span{font-size:11px}.act span{font-size:14px}#bSpd span{font-size:11px}#stickBase{transform:scale(.9)}}
 #bSpd.go{box-shadow:inset 0 0 0 3px var(--ring),0 2px 0 #04070a,0 0 18px rgba(63,214,143,.55)}
 #bShoot::before{content:"";position:absolute;inset:-8px;border-radius:50%;background:conic-gradient(var(--red) calc(var(--pw,0)*1turn),transparent 0);
   -webkit-mask:radial-gradient(farthest-side,transparent calc(100% - 6px),#000 calc(100% - 5px));mask:radial-gradient(farthest-side,transparent calc(100% - 6px),#000 calc(100% - 5px))}
@@ -170,6 +174,7 @@ table.st{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
       <button id="bPass" class="act" aria-label="Pass"><span>PASS</span></button>
       <button id="bShoot" class="act" aria-label="Shoot"><span>SHOOT</span></button>
       <button id="bSpd" class="act" aria-label="Speed burst"><span>SPEED</span></button>
+      <button id="bPoke" class="act" aria-label="Poke check or spin"><span>POKE</span></button>
     </div>
   </div>
 
@@ -193,9 +198,11 @@ table.st{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
         <dt>Pass</dt><dd>Tap to pass where you're skating, or swipe off the button toward a teammate. You can also tap a teammate on the ice.</dd>
         <dt>Speed</dt><dd>Hold for a burst on offense or defense. The green ring is your stamina; it refills when you let go.</dd>
         <dt>Shoot</dt><dd>Tap for a wrister, hold to wind up a slapper. Swipe off the button to pick your corner.</dd>
-        <dt>One-timer</dt><dd>Press Shoot while a pass is on its way to you.</dd>
-        <dt>Defense</dt><dd>Pass becomes Switch, Shoot becomes Check. Skate into the carrier to strip the puck.</dd>
-        <dt>Keys</dt><dd>WASD or arrows, J pass, K shoot, L or Shift speed, P pause.</dd>
+        <dt>One-timer</dt><dd>Press Shoot while a pass is on its way to you (the Shoot button glows). Cross-ice one-timers are the hardest for goalies.</dd>
+        <dt>Spin-o-rama</dt><dd>While carrying, circle the stick all the way around, or tap Spin. Shoot right after and the goalie has bitten on the deke.</dd>
+        <dt>Wraparound</dt><dd>Carry the puck behind the net and come out the other side. Shoot right away to stuff it in at the post.</dd>
+        <dt>Defense</dt><dd>Pass becomes Switch. Check locks onto the nearest opponent and drives through him. Poke reaches out with your stick to knock the puck loose.</dd>
+        <dt>Keys</dt><dd>WASD or arrows, J pass, K shoot, U poke/spin, L or Shift speed, P pause.</dd>
       </dl>
     </div>
   </section>
@@ -360,7 +367,7 @@ function mkP(team,slot,g,ro,def){
   return {team,slot,g,name:ro.name.toUpperCase(),num:ro.num,x:0,y:0,vx:0,vy:0,face:team.dir>0?Math.PI/2:-Math.PI/2,
     down:0,checkCool:0,aiT:rnd(0,.2),weave:rnd(0,6.28),clearCool:0,spray:0,
     spd:clamp(def.spd+v(),.5,1),sht:clamp(def.sht+v(),.5,1)*(slot>=3?.96:1),gk:def.gk,
-    goals:0,assists:0,sog:0,hits:0,saves:0,stride:rnd(0,6.28),amp:0,shotT:0,lungeT:0,bfly:0,lo:.35,ro:.35};
+    goals:0,assists:0,sog:0,hits:0,saves:0,pokeT:0,pokeCool:0,pokeDone:true,spinT:0,spinDir:1,dekeT:0,wrapT:0,wrapIn:0,behind:false,homeT:0,checkTgt:null,biteX:0,biteT:0,stride:rnd(0,6.28),amp:0,shotT:0,lungeT:0,bfly:0,lo:.35,ro:.35};
 }
 function mkTeam(ti,dir,human,home){
   const def=TEAMS[ti], ro=roster(ti);
@@ -373,7 +380,7 @@ function newGame(hi,ai,diff,len,demo=false){
   G={home:mkTeam(hi,1,!demo,true),away:mkTeam(ai,-1,false,false),D:DIFF[diff],diff,perLen:len*60,period:1,clock:len*60,t:0,
     phase:'faceoff',phaseT:0,demo,paused:false,
     P:{x:0,y:0,vx:0,vy:0,owner:null,pass:null,shot:null,beat:null,pickBlock:null,pickBlockT:0,noPickT:0,tried:new Set(),touches:[],frozen:false},
-    ctrl:null,cam:0,camX:0,shake:0,parts:[],floats:[],charging:false,chargeT:0,stam:1,stamLock:false,stamIdle:0,sprint:false,oneT:0,foDropped:false,foPress:null,foHints:0,chaser:[null,null],passHint:null,foSpot:{x:0,y:0}};
+    ctrl:null,cam:0,camX:0,shake:0,parts:[],floats:[],charging:false,chargeT:0,spinAcc:0,spinA:null,oneTLate:0,stam:1,stamLock:false,stamIdle:0,sprint:false,oneT:0,foDropped:false,foPress:null,foHints:0,chaser:[null,null],passHint:null,foSpot:{x:0,y:0}};
   G.home.opp=G.away; G.away.opp=G.home;
   buildRink(); clearTrails(); startFaceoff({x:0,y:0}); updateSB(true);
 }
@@ -523,21 +530,31 @@ function shoot(p,power,aim,oneT){
   const P=G.P, dir=p.team.dir, gy=dir*GL, g=p.team.opp.goalie;
   const acc=p.sht*(p.team.human||G.demo?1:G.D.acc);
   const spd=(52+power*58)*(.88+.12*p.sht)*(oneT?1.06:1);
+  let move=null, wrapCross=false;
+  if(oneT) move='oneT';
+  else if(p.dekeT>0 && hyp(p.x,gy-P.y)<42) move='spin';
+  else if(p.wrapT>0 && !p.behind && Math.abs(p.x)<17 && p.y*dir>GL-12){ move='wrap'; wrapCross=Math.sign(p.x||1)!==p.wrapIn; }
   let ang;
   if(aim) ang=Math.atan2(aim.y,aim.x);
   else {
     let ax; const sx=p.team.human?inp.mx:0;
-    if(Math.abs(sx)>.35) ax=Math.sign(sx)*2.45*dir*dir;
+    if(move==='spin') ax=g.biteT>0?-Math.sign(g.biteX)*2.45:(g.x>0?-2.45:2.45);
+    else if(move==='wrap') ax=Math.sign(p.x||1)*1.5;
+    else if(Math.abs(sx)>.35) ax=Math.sign(sx)*2.45*dir*dir;
     else ax= g.x>.25?-2.4:g.x<-.25?2.4:(Math.random()<.5?-2.4:2.4);
     ang=Math.atan2(gy-P.y,ax-P.x);
   }
-  ang+=gauss()*(.022+(1-acc)*.06+power*.028)/Math.max(.6,acc);
+  p.dekeT=0; p.wrapT=0;
+  ang+=gauss()*(.022+(1-acc)*.06+power*.028)/Math.max(.6,acc)*(move==='wrap'?.45:1);
   releasePuck(p,Math.cos(ang)*spd,Math.sin(ang)*spd,.3); p.shotT=.35;
   let onNet=false; if(P.vy*dir>0){ const t=(gy-P.y)/P.vy; const xc=P.x+P.vx*t; onNet=Math.abs(xc)<NW; }
-  P.shot={by:p,team:p.team,oneT,spd,t:0,onNet,d0:hyp(P.x,gy-P.y),gMove:hyp(g.vx,g.vy)};
+  P.shot={by:p,team:p.team,oneT,spd,t:0,onNet,d0:hyp(P.x,gy-P.y),gMove:hyp(g.vx,g.vy),move,wrapCross};
+  P.lastMove=move; P.lastMoveBy=p; P.lastMoveT=G.t;
   P.pass=null; pushTouch(p);
   A.shot(power); if(power>.75) G.shake=Math.max(G.shake,.18);
   if(oneT) floatTxt(p.x,p.y+3,'ONE-TIMER!','#ffb020');
+  else if(move==='wrap') floatTxt(p.x,p.y+3,'WRAPAROUND!','#ffb020');
+  else if(move==='spin') floatTxt(p.x,p.y+3,'DEKE!','#ffb020');
 }
 function tryCheck(c){
   if(c.checkCool>0||c.down>0) return; c.checkCool=.75;
@@ -546,13 +563,69 @@ function tryCheck(c){
   let v=null, vd=c===G.ctrl?5.2:4.4;
   for(const o of c.team.opp.players){ if(o.down>0) continue; const dx=o.x-c.x, dy=o.y-c.y, d=hyp(dx,dy); if(d<vd && (dx*fx+dy*fy)/(d||1)>.1){ vd=d; v=o; } }
   if(!v) return;
-  const s=clamp(hyp(c.vx,c.vy)/30,.25,1.2), dx=(v.x-c.x)/(vd||1), dy=(v.y-c.y)/(vd||1);
+  applyHit(c,v);
+}
+function applyHit(c,v){
+  if(v.down>0) return;
+  if(v.spinT>0 && Math.random()<.6){ floatTxt(v.x,v.y+3,'SPUN AWAY','#9fd3ff'); c.vx*=.4; c.vy*=.4; return; }
+  const vd=hyp(v.x-c.x,v.y-c.y)||1;
+  const s=clamp(hyp(c.vx,c.vy)/30,.25,1.2), dx=(v.x-c.x)/vd, dy=(v.y-c.y)/vd;
   v.down=.8+s*.7; v.vx+=dx*(9+s*12); v.vy+=dy*(9+s*12); c.vx*=.5; c.vy*=.5;
   if(G.P.owner===v) releasePuck(v,v.vx*.6+rnd(-10,10),v.vy*.6+rnd(-10,10),.4);
   c.team.hits++; c.hits++; A.check(s); G.shake=Math.max(G.shake,.15+.3*s);
   for(let i=0;i<8;i++) G.parts.push({x:v.x,y:v.y,vx:rnd(-12,12),vy:rnd(-12,12),l:rnd(.3,.6)});
   if(s>.8) floatTxt(v.x,v.y+3,'BIG HIT!','#ff6b5a');
   if(c.team.human||v.team.human) buzz(s>.8?40:20);
+}
+
+// assisted check for the player you control: locks onto the carrier (or nearest opponent) and drives through him
+function humanCheck(c){
+  if(c.checkCool>0||c.down>0) return; c.checkCool=.6; c.lungeT=.3;
+  const P=G.P; let v=null, vd=1e9;
+  const car=P.owner&&P.owner.team!==c.team&&P.owner.down<=0?P.owner:null;
+  if(car){ const d=hyp(car.x-c.x,car.y-c.y); if(d<11){ v=car; vd=d; } }
+  if(!v) for(const o of c.team.opp.players){ if(o.down>0) continue; const d=hyp(o.x-c.x,o.y-c.y); if(d<7.5&&d<vd){ vd=d; v=o; } }
+  if(!v){ c.vx+=Math.cos(c.face)*9; c.vy+=Math.sin(c.face)*9; return; }
+  c.face=Math.atan2(v.y-c.y,v.x-c.x);
+  const sp=Math.max(hyp(c.vx,c.vy),22), ux=(v.x-c.x)/vd, uy=(v.y-c.y)/vd; c.vx=ux*sp; c.vy=uy*sp;
+  c.checkTgt=v; c.homeT=.38;
+  if(vd<2*SR+1.1){ applyHit(c,v); c.homeT=0; }
+}
+// poke check: the stick shoots out in front; anything in reach gets knocked loose
+function tryPoke(c){
+  if(c.pokeCool>0||c.down>0||c.pokeT>0) return;
+  c.pokeCool=.5; c.pokeT=.32; c.pokeDone=false;
+  const P=G.P; if(hyp(P.x-c.x,P.y-c.y)<10) c.face=Math.atan2(P.y-c.y,P.x-c.x);
+  c.vx+=Math.cos(c.face)*3; c.vy+=Math.sin(c.face)*3;
+  A.nz(.08,'bandpass',1300,1.2,.14);
+}
+function resolvePoke(c){
+  c.pokeDone=true;
+  const P=G.P, fx=Math.cos(c.face), fy=Math.sin(c.face);
+  const ax=c.x+fx*1.4, ay=c.y+fy*1.4, sx=fx*4.6, sy=fy*4.6;
+  const t=clamp(((P.x-ax)*sx+(P.y-ay)*sy)/(sx*sx+sy*sy),0,1), d=hyp(ax+sx*t-P.x,ay+sy*t-P.y);
+  if(d>1.9) return;
+  const o=P.owner;
+  if(o&&o.team!==c.team){
+    let pr=c.team.human?(G.D===DIFF.rookie?.85:G.D===DIFF.allstar?.62:.72):.5;
+    if(o.spinT>0) pr*=.4;
+    if(Math.random()<pr){
+      const lat=rnd(-.6,.6);
+      releasePuck(o,(fx*14-fy*lat*10)*.65,(fy*14+fx*lat*10)*.65,.45);
+      floatTxt(P.x,P.y+3,'POKE!','#c49bff'); A.poke(); if(c.team.human||o.team.human) buzz(15);
+    } else A.poke();
+  } else if(!o){
+    P.vx=P.vx*.2-fx*6; P.vy=P.vy*.2-fy*6; P.pass=null; P.shot=null; P.pickBlock=null; A.poke();
+  }
+}
+// spin-o-rama: a full 360 that protects the puck and makes a nearby goalie bite
+function doSpin(c,dir){
+  if(c.spinT>0||c.down>0) return;
+  c.spinT=.5; c.spinDir=dir||1; c.dekeT=1.5;
+  floatTxt(c.x,c.y+3,'SPIN-O-RAMA!','#ffb020'); A.nz(.3,'bandpass',900,.8,.22);
+  for(let i=0;i<10;i++) G.parts.push({x:c.x,y:c.y,vx:rnd(-14,14),vy:rnd(-14,14),l:rnd(.25,.5)});
+  const g=c.team.opp.goalie, gy=c.team.dir*GL;
+  if(hyp(c.x,gy-c.y)<38){ g.biteX=(c.x>=g.x?1:-1)*2.1; g.biteT=1.3; }
 }
 
 // ---------------- AI ----------------
@@ -615,9 +688,10 @@ function aiCarrier(p,dt){
   if(p.aiT<=0){
     p.aiT=.18;
     if(f>36 && f<87 && dG<46 && Math.abs(p.x)<27){
-      let pr=(46-dG)/46*.7+(nd>6?.18:0); pr*=.35+.65*D.aggr;
+      let pr=(46-dG)/46*.7+(nd>6?.18:0)+(p.dekeT>0&&p.spinT<=0?.5:0); pr*=.35+.65*D.aggr;
       if(Math.random()<pr){ shoot(p,rnd(.45,1),null,false); return [0,0]; }
     }
+    if(nd<5 && f>30 && p.spinT<=0 && p.dekeT<=0 && Math.random()<.07*D.aggr){ doSpin(p,Math.random()<.5?1:-1); return [0,0]; }
     if(nd<7 && Math.random()<.4*D.pass){ const t=aiPassTarget(p,false); if(t){ passTo(p,t); return [0,0]; } }
     if(f<-25 && Math.random()<.18*D.pass){ const t=aiPassTarget(p,true); if(t){ passTo(p,t); return [0,0]; } }
   }
@@ -645,8 +719,8 @@ function contests(dt){
     const sx=d.x+Math.cos(d.face)*1.7, sy=d.y+Math.sin(d.face)*1.7;
     const dist=Math.min(hyp(sx-P.x,sy-P.y),hyp(d.x-P.x,d.y-P.y));
     if(dist<2.2){
-      let rate=d===G.ctrl?3.2:(d.team.human?1:1.3*D.aggr); if(o===G.ctrl) rate*=.65;
-      if(Math.random()<rate*dt){ releasePuck(o,0,0,.4); P.owner=null; setOwner(d); A.poke(); return; }
+      let rate=d===G.ctrl?3.2:(d.team.human?1:1.3*D.aggr); if(o===G.ctrl) rate*=.65; if(o.spinT>0) rate*=.2;
+      if(Math.random()<rate*dt){ d.pokeT=.32; d.pokeDone=true; releasePuck(o,0,0,.4); P.owner=null; setOwner(d); A.poke(); return; }
     }
     if(d!==G.ctrl && d.checkCool<=0 && hyp(d.x-o.x,d.y-o.y)<4.2){
       const rate=d.team.human?.18:.42*D.aggr;
@@ -659,15 +733,18 @@ function contests(dt){
 function moveSkater(p,dx,dy,dt){
   const ox=p.x, oy=p.y;
   if(p.down>0){ p.down-=dt; dx=dy=0; }
+  if(p.homeT>0&&p.checkTgt&&p.down<=0){ const t=p.checkTgt, hx=t.x+t.vx*.08-p.x, hy=t.y+t.vy*.08-p.y, hd=hyp(hx,hy)||1; dx=hx/hd; dy=hy/hd; }
   let m=hyp(dx,dy); if(m>1){dx/=m;dy/=m;m=1;}
-  const max=maxSpd(p)*(G.P.owner===p?.93:1), sp=hyp(p.vx,p.vy);
+  const max=maxSpd(p)*(G.P.owner===p?.93:1)*(p.homeT>0?1.25:1), sp=hyp(p.vx,p.vy);
   if(m>.05){
     if(sp>13 && (p.vx*dx+p.vy*dy)/sp<-.35){ p.spray=.15; if(Math.random()<.5) G.parts.push({x:p.x+p.vx*.06,y:p.y+p.vy*.06,vx:p.vx*.4+rnd(-6,6),vy:p.vy*.4+rnd(-6,6),l:rnd(.25,.5)}); }
-    let ax=dx*max-p.vx, ay=dy*max-p.vy; const al=hyp(ax,ay), acc=52*SKATE_PACE*dt*(G.sprint&&p===G.ctrl?2:1); if(al>acc){ax*=acc/al;ay*=acc/al;}
+    let ax=dx*max-p.vx, ay=dy*max-p.vy; const al=hyp(ax,ay), acc=52*SKATE_PACE*dt*(G.sprint&&p===G.ctrl?2:1)*(p.homeT>0?2:1); if(al>acc){ax*=acc/al;ay*=acc/al;}
     p.vx+=ax; p.vy+=ay;
   } else if(sp>0){ const ns=Math.max(0,sp-(p.down>0?20:13)*dt); p.vx*=ns/sp; p.vy*=ns/sp; }
   p.x+=p.vx*dt; p.y+=p.vy*dt;
   let ta=null; if(m>.2&&p.down<=0) ta=Math.atan2(dy,dx); else if(sp>3) ta=Math.atan2(p.vy,p.vx);
+  if(p.spinT>0){ p.face+=p.spinDir*2*Math.PI*dt/.5; p.spinT-=dt; ta=null; if(Math.random()<dt*18) G.parts.push({x:p.x,y:p.y,vx:rnd(-10,10),vy:rnd(-10,10),l:rnd(.2,.35)}); }
+  else if(p.pokeT>0) ta=null;
   if(ta!==null){ let d=ta-p.face; while(d>Math.PI)d-=2*Math.PI; while(d<-Math.PI)d+=2*Math.PI; const r=10*dt; p.face+=clamp(d,-r,r); }
   const n=rinkConstrain(p,SR);
   if(n){ const vn=p.vx*n.x+p.vy*n.y; if(vn<0){ p.vx-=1.15*vn*n.x; p.vy-=1.15*vn*n.y; if(vn<-15&&p.down>0){ A.board(-vn); G.shake=Math.max(G.shake,.22); } } }
@@ -685,6 +762,8 @@ function moveSkater(p,dx,dy,dt){
     p.lo=lo; p.ro=ro;
   }
   if(p.checkCool>0) p.checkCool-=dt;
+  if(p.pokeT>0) p.pokeT-=dt; if(p.pokeCool>0) p.pokeCool-=dt; if(p.homeT>0) p.homeT-=dt;
+  if(p.dekeT>0&&p.spinT<=0) p.dekeT-=dt; if(p.wrapT>0&&!p.behind) p.wrapT-=dt;
 }
 function updGoalie(g,dt){
   const P=G.P, side=-g.team.dir, ny=side*GL;
@@ -696,7 +775,9 @@ function updGoalie(g,dt){
     if(P.y*side>GL){ ix=(P.x>=0?1:-1)*2.5; iy=ny-side*1.3; }
     else { const ax=P.x, ay=P.y-ny, d=hyp(ax,ay)||1, out=clamp(d*.08,1.8,3.4); ix=clamp(ax/d*out,-3.7,3.7); iy=ny+ay/d*out; if(iy*side>GL-1) iy=ny-side*1; }
   }
-  const spd=(12+g.gk*10)*(P.shot?1.35:1), dx=ix-g.x, dy=iy-g.y, d=hyp(dx,dy);
+  if(g.biteT>0){ g.biteT-=dt; ix=clamp(ix+g.biteX,-3.7,3.7); }
+  const behind=(P.owner?P.owner.y:P.y)*side>GL-1&&Math.abs(ix-g.x)>2.5;
+  const spd=(12+g.gk*10)*(P.shot?1.35:1)*(behind?.5:1), dx=ix-g.x, dy=iy-g.y, d=hyp(dx,dy);
   const st=Math.min(d,spd*dt); const nx=d?dx/d*st:0, ny2=d?dy/d*st:0;
   g.x+=nx; g.y+=ny2; g.vx=nx/dt; g.vy=ny2/dt;
   const tf=Math.atan2(P.y-g.y,P.x-g.x); let df=tf-g.face; while(df>Math.PI)df-=2*Math.PI; while(df<-Math.PI)df+=2*Math.PI; g.face+=clamp(df,-8*dt,8*dt);
@@ -730,7 +811,9 @@ function goalieFree(g,px0,py0){
     const lat=Math.abs((cx-g.x)*(-uy)+(cy-g.y)*ux)/reach;
     const sh=P.shot, humanShooter=sh?sh.team.human:false;
     let pr=g.gk*.98+.05-Math.max(0,spd-70)/300-lat*lat*.34+clamp(((sh?sh.d0:30)-22)/100,0,.25);
-    if(sh&&sh.oneT) pr-=.06+Math.min(.22,sh.gMove/40);
+    if(sh&&sh.oneT) pr-=.06+Math.min(.22,sh.gMove/40)+(humanShooter?.06:0);
+    if(sh&&sh.move==='spin') pr-=g.biteT>0?.24:.14;
+    if(sh&&sh.move==='wrap') pr-=sh.wrapCross?.2:.1;
     if(!G.demo) pr*=humanShooter?G.D.cpuG:G.D.humG;
     pr=clamp(pr,.12,.97);
     if(Math.random()<pr){
@@ -772,7 +855,8 @@ function goalScored(side){
     for(let i=si+1;i<P.touches.length;i++){ const t=P.touches[i]; if(t.team!==team) break; if(t!==scorer&&!t.g){ assist=t; assist.assists++; break; } } }
   G.phase='goal'; G.phaseT=0; P.shot=null; P.pass=null;
   if(!G.demo){
-    $('#goalTxt').innerHTML=scorer?`${team.def.abbr} · #${scorer.num} ${scorer.name}${assist?` <span>· ast #${assist.num} ${assist.name}</span>`:' <span>· unassisted</span>'}`:`${team.def.abbr} · own goal`;
+    const mvName=(scorer&&P.lastMoveBy===scorer&&G.t-P.lastMoveT<2.5)?{oneT:'One-timer',spin:'Spin-o-rama',wrap:'Wraparound'}[P.lastMove]:null;
+    $('#goalTxt').innerHTML=(mvName?`<b style="color:var(--led)">${mvName.toUpperCase()}</b> · `:'')+(scorer?`${team.def.abbr} · #${scorer.num} ${scorer.name}${assist?` <span>· ast #${assist.num} ${assist.name}</span>`:' <span>· unassisted</span>'}`:`${team.def.abbr} · own goal`);
     const gb=$('#goal'); gb.classList.remove('on'); void gb.offsetWidth; gb.classList.add('on');
     const l=$('#lamp'); l.classList.remove('on'); void l.offsetWidth; l.classList.add('on');
     A.horn(); M.duck(3.2); buzz([60,40,60]);
@@ -846,12 +930,15 @@ function receive(s){
   const P=G.P, wasPass=P.pass&&P.pass.to===s;
   setOwner(s);
   if(s===G.ctrl && wasPass && (G.oneT>0||(inp.shoot.down&&!G.charging))){ G.oneT=0; shoot(s,.92,null,true); return; }
+  if(s===G.ctrl && wasPass) G.oneTLate=.25;
   if(!s.team.human && wasPass){ const f=s.y*s.team.dir; if(f>58&&Math.abs(s.x)<22&&Math.random()<.4*(G.demo?1:G.D.aggr)) shoot(s,rnd(.7,1),null,true); }
 }
 
 // ---------------- faceoffs, periods ----------------
 function startFaceoff(spot){
   const P=G.P;
+  for(const p of skaters().concat([G.home.goalie,G.away.goalie])){ p.spinT=p.pokeT=p.homeT=p.dekeT=p.wrapT=p.biteT=0; p.behind=false; p.checkTgt=null; }
+  G.spinAcc=0; G.oneTLate=0;
   for(const team of [G.home,G.away]){
     const dir=team.dir, L=[[0,-2.3],[-12,-5],[12,-5],[-10,-20],[10,-20]];
     team.players.forEach((p,i)=>{ p.x=clamp(spot.x+L[i][0]*dir,-RW+3,RW-3); p.y=clamp(spot.y+L[i][1]*dir,-RH+4,RH-4); p.vx=p.vy=0; p.down=0; p.face=dir>0?Math.PI/2:-Math.PI/2; rinkConstrain(p,SR); netWalls(p,SR,true,0); });
@@ -918,7 +1005,7 @@ function endGame(){
 
 // ---------------- input ----------------
 const mkBtn=()=>({down:false,pressed:false,released:false,id:null,sx:0,sy:0,dx:0,dy:0,asOwner:false});
-const inp={mx:0,my:0,stick:{id:null,x:0,y:0},pass:mkBtn(),shoot:mkBtn(),speed:mkBtn(),taps:[]};
+const inp={mx:0,my:0,stick:{id:null,x:0,y:0},pass:mkBtn(),shoot:mkBtn(),speed:mkBtn(),poke:mkBtn(),taps:[]};
 const isOwner=()=>!!(G&&G.P.owner&&G.P.owner===G.ctrl);
 function pressBtn(b){ b.down=true; b.pressed=true; b.dx=b.dy=0; b.asOwner=isOwner(); }
 function bindBtn(el,b){
@@ -928,7 +1015,7 @@ function bindBtn(el,b){
   el.addEventListener('pointerup',up); el.addEventListener('pointercancel',up);
   el.addEventListener('contextmenu',e=>e.preventDefault());
 }
-bindBtn($('#bPass'),inp.pass); bindBtn($('#bShoot'),inp.shoot); bindBtn($('#bSpd'),inp.speed);
+bindBtn($('#bPass'),inp.pass); bindBtn($('#bShoot'),inp.shoot); bindBtn($('#bSpd'),inp.speed); bindBtn($('#bPoke'),inp.poke);
 const zone=$('#stickZone'), base=$('#stickBase'), knob=$('#stickKnob');
 zone.addEventListener('pointerdown',e=>{
   if(inp.stick.id!==null) return; e.preventDefault(); try{zone.setPointerCapture(e.pointerId);}catch(_){}
@@ -961,12 +1048,14 @@ addEventListener('keydown',e=>{
   if(keys.has(k)) return; keys.add(k);
   if(k==='j'||k==='z') pressBtn(inp.pass);
   if(k==='l'||k==='shift') pressBtn(inp.speed);
+  if(k==='u'||k==='c') pressBtn(inp.poke);
   if(k==='k'||k==='x'||k===' ') pressBtn(inp.shoot);
   if(k==='p'||k==='escape') togglePause();
 });
 addEventListener('keyup',e=>{ const k=e.key.toLowerCase(); keys.delete(k);
   if(k==='j'||k==='z'){ inp.pass.down=false; inp.pass.released=true; }
   if(k==='l'||k==='shift'){ inp.speed.down=false; inp.speed.released=true; }
+  if(k==='u'||k==='c'){ inp.poke.down=false; inp.poke.released=true; }
   if(k==='k'||k==='x'||k===' '){ inp.shoot.down=false; inp.shoot.released=true; }
 });
 function readMove(){
@@ -986,23 +1075,34 @@ function humanActions(){
   if(P.owner===G.ctrl){
     const o=G.ctrl;
     if(inp.pass.released && inp.pass.asOwner){ const t=pickPassTarget(o,swipe(inp.pass)||stickV()); if(t) passTo(o,t); }
+    else if(inp.shoot.pressed && G.oneTLate>0){ G.oneTLate=0; G.charging=false; shoot(o,.92,null,true); }
     else {
+      if(inp.poke.pressed){ const v=stickV(); doSpin(o,v&&(v.x*Math.sin(o.face)-v.y*Math.cos(o.face))>0?-1:1); }
       if(inp.shoot.pressed){ G.charging=true; G.chargeT=0; }
       if(G.charging && inp.shoot.released){ G.charging=false; shoot(o,.32+.68*clamp(G.chargeT/.55,0,1),swipe(inp.shoot),false); }
     }
   } else {
     G.charging=false;
     const incoming=P.pass&&P.pass.to===G.ctrl;
-    if(inp.shoot.pressed){ if(incoming) G.oneT=.8; else tryCheck(G.ctrl); }
+    if(inp.shoot.pressed){ if(incoming) G.oneT=.8; else humanCheck(G.ctrl); }
+    if(inp.poke.pressed) tryPoke(G.ctrl);
     if(inp.pass.pressed && !incoming) switchPlayer();
   }
 }
-function clearEdges(){ for(const b of [inp.pass,inp.shoot,inp.speed]){ b.pressed=false; b.released=false; } inp.taps.length=0; }
+function clearEdges(){ for(const b of [inp.pass,inp.shoot,inp.speed,inp.poke]){ b.pressed=false; b.released=false; } inp.taps.length=0; }
 
 // ---------------- step ----------------
 function step(dt){
   G.t+=dt; G.shake=Math.max(0,G.shake-dt*1.6);
   if(G.oneT>0) G.oneT-=dt;
+  if(G.oneTLate>0) G.oneTLate-=dt;
+  // spin-o-rama: circle the stick around while carrying
+  if(G.phase==='play'&&G.home.human&&G.ctrl&&G.P.owner===G.ctrl&&G.ctrl.spinT<=0){
+    if(hyp(inp.mx,inp.my)>.55){ const a=Math.atan2(inp.my,inp.mx); if(G.spinA!==null){ let d=a-G.spinA; while(d>Math.PI)d-=2*Math.PI; while(d<-Math.PI)d+=2*Math.PI; G.spinAcc+=d; } G.spinA=a; }
+    else G.spinA=null;
+    G.spinAcc*=Math.exp(-dt*1.8);
+    if(Math.abs(G.spinAcc)>4.4){ doSpin(G.ctrl,Math.sign(G.spinAcc)); G.spinAcc=0; }
+  } else { G.spinAcc=0; G.spinA=null; }
   if(G.charging&&inp.shoot.down) G.chargeT+=dt;
   // speed burst: drains while held and moving, refills after a short rest
   const canGo=G.home.human&&G.ctrl&&G.ctrl.down<=0&&(G.phase==='play'||G.phase==='goal')&&hyp(inp.mx,inp.my)>.2;
@@ -1016,9 +1116,19 @@ function step(dt){
     let d=[0,0];
     if(p===G.ctrl && (live||ph==='goal')){
       d=[inp.mx,inp.my];
+      // wraparound assist: coming out from behind the net, pull the carrier tight around the post
+      if(live&&G.P.owner===p&&p.wrapT>0&&!p.behind&&hyp(d[0],d[1])>.2){ const tx=Math.sign(p.x||1)*3.8, ty=p.team.dir*(GL-2.2), hx=tx-p.x, hy=ty-p.y, hd=hyp(hx,hy); if(hd<16&&hd>.6) d=[d[0]*.45+hx/hd*.65,d[1]*.45+hy/hd*.65]; }
       if(live && G.P.pass && G.P.pass.to===p && hyp(d[0],d[1])<.15) d=aiSkater(p,dt);
     } else if(live) d=aiSkater(p,dt);
     moveSkater(p,d[0],d[1],dt);
+  }
+  if(live){
+    for(const p of skaters()){
+      if(p.pokeT>0&&!p.pokeDone&&p.pokeT<.22) resolvePoke(p);
+      if(p.homeT>0&&p.checkTgt){ const t=p.checkTgt; if(t.down>0) p.homeT=0; else if(hyp(t.x-p.x,t.y-p.y)<2*SR+1.1){ applyHit(p,t); p.homeT=0; } }
+    }
+    const o=G.P.owner;
+    if(o){ const f=o.y*o.team.dir; if(f>GL+.3){ if(!o.behind) o.wrapIn=Math.sign(o.x)||1; o.behind=true; o.wrapT=1.3; } else o.behind=false; }
   }
   bodies();
   for(const g of [G.home.goalie,G.away.goalie]) updGoalie(g,dt);
@@ -1076,12 +1186,14 @@ function drawSkaterBody(p,C){
   drawSkate(L[0],L[1],lr); drawSkate(R[0],R[1],rr);
   for(const [k,hx] of [[L,-.38],[R,.38]]){ const hip=[hx,-.2], knee=lp(hip,[k[0],k[1]+.35],.5); line(knee,[k[0],k[1]+.3],.42,C.sock); line(hip,knee,.56,C.pants); }
   ctx.fillStyle=C.pants; ctx.beginPath(); ctx.ellipse(0,-.2,.82,.56,0,0,7); ctx.fill();
-  ctx.save(); ctx.translate(0,.12+lunge*.5+(dn?0:.08*a)); ctx.rotate(dn?0:(.2*a*s-wind*.55+fol*.45));
+  ctx.save(); ctx.translate(0,.12+lunge*.5+(dn?0:.08*a)+(p.pokeT>0?Math.sin(Math.PI*clamp(1-p.pokeT/.32,0,1))*.35:0)); ctx.rotate(dn?0:(.2*a*s-wind*.55+fol*.45));
   // stick + arms
   const sw=own?Math.sin(G.t*9)*.38:Math.sin(G.t*2+p.weave)*.08;
   let H1=[.15,.95], H2=[.68+sw*.4,1.45], B=[.45+sw,2.8];
   if(wind>0){ H1=lp(H1,[.75,.55],wind); H2=lp(H2,[1.35,.65],wind); B=lp(B,[2.3,-.4],wind); }
   if(fol>0){ H1=lp(H1,[-.1,1.2],fol); H2=lp(H2,[.15,1.75],fol); B=lp(B,[-.9,3.1],fol); }
+  const pk=p.pokeT>0?Math.sin(Math.PI*clamp(1-p.pokeT/.32,0,1)):0;
+  if(pk>0){ H1=lp(H1,[.05,2.05],pk); H2=lp(H2,[.3,2.6],pk); B=lp(B,[.2,4.4],pk); }
   if(dn){ H1=[-1.7,.6]; H2=[1.6,.9]; B=[2.6,2.4]; }
   const sd=[B[0]-H1[0],B[1]-H1[1]], sl=hyp(sd[0],sd[1])||1, top=[H1[0]-sd[0]/sl*.35,H1[1]-sd[1]/sl*.35];
   line(top,B,.17,'#3a2d22'); line(top,lp(top,B,.12),.19,'#111');
@@ -1244,7 +1356,7 @@ function updateButtons(){
   if(!G||G.demo) return;
   const P=G.P, own=P.owner&&P.owner===G.ctrl, inc=P.pass&&P.pass.to===G.ctrl;
   const k=own?'o':inc?'i':'d';
-  if(k!==lblCache){ lblCache=k; $('#bPass span').textContent=own||inc?'PASS':'SWITCH'; $('#bShoot span').textContent=own||inc?'SHOOT':'CHECK'; }
+  if(k!==lblCache){ lblCache=k; $('#bPass span').textContent=own||inc?'PASS':'SWITCH'; $('#bShoot span').textContent=own?'SHOOT':inc?'1-TIMER':'CHECK'; $('#bPoke span').textContent=own?'SPIN':'POKE'; $('#bShoot').classList.toggle('ready',!!inc); }
   $('#bShoot').style.setProperty('--pw',G.charging?clamp(G.chargeT/.55,0,1).toFixed(3):0);
   const sb=$('#bSpd'); sb.style.setProperty('--st',G.stam.toFixed(3)); sb.style.setProperty('--sc',G.stamLock?'#e5383e':G.stam<.3?'#ffb020':'#3fd68f');
   sb.classList.toggle('empty',G.stamLock); sb.classList.toggle('go',G.sprint);
