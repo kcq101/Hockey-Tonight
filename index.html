@@ -85,14 +85,14 @@ button:focus-visible{outline:2px solid var(--led);outline-offset:2px}
   box-shadow:inset 0 0 0 3px var(--ring),0 4px 0 rgba(4,7,10,.35),0 8px 14px rgba(0,0,0,.25);transition:transform .05s}
 .act span{font:800 16px/1 var(--f-display);letter-spacing:.1em;pointer-events:none;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.7)}
 .act.on{transform:translateY(4px);box-shadow:inset 0 0 0 3px var(--ring),0 1px 0 rgba(4,7,10,.35),0 3px 6px rgba(0,0,0,.25);background:radial-gradient(circle at 50% 32%,rgba(60,78,100,.72),rgba(20,30,44,.65) 72%)}
-/* four equal buttons in a diamond: X top, Y left, A right, B bottom */
+/* four equal buttons in a diamond: B (pass/switch) top, Y left, A right, X (speed) bottom */
 .dia{position:absolute;right:max(10px,env(safe-area-inset-right,0px));bottom:8px;--s:62px;--o:58px;width:calc(2*var(--o) + var(--s));height:calc(2*var(--o) + var(--s))}
 .dia .act{width:var(--s);height:var(--s)}
 .dia .act span{font-size:13px;line-height:1.05;text-align:center;letter-spacing:.06em}
-#bX{--ring:#3fd68f;left:var(--o);top:0}
+#bX{--ring:#3fd68f;left:var(--o);top:calc(2*var(--o))}
 #bY{--ring:#c49bff;left:0;top:var(--o)}
 #bA{--ring:var(--led);left:calc(2*var(--o));top:var(--o)}
-#bB{--ring:var(--ice);left:var(--o);top:calc(2*var(--o))}
+#bB{--ring:var(--ice);left:var(--o);top:0}
 .act.ready{animation:rdy .45s ease-in-out infinite alternate}
 @keyframes rdy{to{box-shadow:inset 0 0 0 3px var(--ring),0 0 0 4px rgba(255,176,32,.35),0 0 24px rgba(255,176,32,.85)}}
 .act.hit{box-shadow:inset 0 0 0 3px #ff5a4a,0 0 18px rgba(255,90,74,.6)}
@@ -310,15 +310,15 @@ table.st{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
         <button class="pxBtn pri" id="bOptBack">Done</button>
         <dl class="how">
         <dt>Stick</dt><dd>Touch anywhere on the left to skate.</dd>
-        <dt>Buttons</dt><dd>Four buttons in a diamond. Top: Speed. Left: Slapshot / Poke check. Right: Wrist shot / Body check. Bottom: Pass / Switch player.</dd>
-        <dt>Speed</dt><dd>Hold the top button for a burst. The green ring is your stamina; it refills when you let go.</dd>
-        <dt>Pass</dt><dd>Tap the bottom button to pass where you're skating, or swipe off it toward a teammate. You can also tap a teammate on the ice.</dd>
+        <dt>Buttons</dt><dd>Four buttons in a diamond. Top: Pass / Switch player. Left: Slapshot / Poke check. Right: Wrist shot / Body check. Bottom: Speed.</dd>
+        <dt>Speed</dt><dd>Hold the bottom button for a burst. The green ring is your stamina; it refills when you let go.</dd>
+        <dt>Pass</dt><dd>Tap the top button to pass where you're skating, or swipe off it toward a teammate. You can also tap a teammate on the ice.</dd>
         <dt>Shots</dt><dd>Right button is a quick wrist shot. Left button winds up a slapshot: hold to power it up, let go to fire. Swipe off either to pick your corner.</dd>
         <dt>One-timer</dt><dd>Press either shot button while a pass is on its way to you (they glow). Cross-ice one-timers are the hardest for goalies.</dd>
         <dt>Spin-o-rama</dt><dd>While carrying, circle the stick all the way around. Shoot right after and the goalie has bitten on the deke.</dd>
         <dt>Wraparound</dt><dd>Carry the puck behind the net and come out the other side. Shoot right away to stuff it in at the post.</dd>
-        <dt>Defense</dt><dd>Top and right buttons are a speed burst, and turn into a body check when an opponent is close (they turn red and say Check). Left button pokes the puck loose with your stick. Bottom button switches player.</dd>
-        <dt>Keys</dt><dd>WASD or arrows. L or Shift: top. U: left. K or Space: right. J: bottom. P pause.</dd>
+        <dt>Defense</dt><dd>Bottom and right buttons are a speed burst, and turn into a body check when an opponent is close (they turn red and say Check). Left button pokes the puck loose with your stick. Top button switches player.</dd>
+        <dt>Keys</dt><dd>WASD or arrows. J: top. U: left. K or Space: right. L or Shift: bottom. P pause.</dd>
       </dl>
       </div>
     </div>

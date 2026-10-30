@@ -17,12 +17,12 @@ Four equal buttons in a diamond at the bottom right, plus the stick on the left.
 
 | Button | Offense | Defense |
 |---|---|---|
-| Top | Speed burst (hold; uses stamina) | Speed burst, or a body check when an opponent is close |
+| Top | Pass (tap, or swipe toward a teammate) | Switch player |
 | Left | Slapshot: hold to wind up, let go to fire | Poke check |
-| Right | Wrist shot (swipe off to pick a corner) | Same as top: speed burst, or body check when close |
-| Bottom | Pass (tap, or swipe toward a teammate) | Switch player |
+| Right | Wrist shot (swipe off to pick a corner) | Speed burst, or a body check when an opponent is close |
+| Bottom | Speed burst (hold; uses stamina) | Same as right: speed burst, or body check when close |
 
-On defense the top and right buttons turn red and read "Check" when a body check is available.
+On defense the bottom and right buttons turn red and read "Check" when a body check is available.
 
 ### Scoring moves
 
@@ -32,7 +32,7 @@ On defense the top and right buttons turn red and read "Check" when a body check
 
 Tap a teammate on the ice to pass to him.
 
-Keyboard: WASD/arrows; L or Shift = top, U = left, K or Space = right, J = bottom; P pause.
+Keyboard: WASD/arrows; J = top, U = left, K or Space = right, L or Shift = bottom; P pause.
 
 ## Project layout
 
