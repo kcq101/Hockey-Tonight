@@ -373,7 +373,7 @@ const RW=42.5, RH=100, RR=28, GL=89, NW=3, ND=3.4, PR=0.5, SR=1.6, GR=2.5;
 
 // ---------------- teams ----------------
 const TEAMS=[
-  {abbr:'VFF',city:'Valley Forge',name:'Frost',   c1:'#2563c9',c2:'#d6e6ff',dk:'#0d2350',spd:.82,sht:.80,pas:.88,gk:.86},
+  {abbr:'VFC',city:'Valley Forge',name:'Colonials',c1:'#2563c9',c2:'#d6e6ff',dk:'#0d2350',spd:.82,sht:.80,pas:.88,gk:.86},
   {abbr:'BAL',city:'Baltimore',  name:'Hammers', c1:'#d6512a',c2:'#ffd8c7',dk:'#3a1508',spd:.78,sht:.90,pas:.78,gk:.81},
   {abbr:'LKS',city:'Lakeshore',  name:'Lancers', c1:'#0e8c7f',c2:'#c4f1e9',dk:'#05362f',spd:.89,sht:.78,pas:.84,gk:.80},
   {abbr:'TUC',city:'Tucson',     name:'Vipers',  c1:'#7a3fc8',c2:'#e5d5ff',dk:'#26104a',spd:.93,sht:.84,pas:.76,gk:.77},
@@ -384,8 +384,15 @@ const SURN=['Kowal','Reyes','Lindgren','Dubois','Okafor','Brennan','Makela','Sat
 function roster(ti){
   const r=mulberry(ti*7919+13), pool=SURN.slice(), used=new Set(), out=[];
   for(let i=0;i<6;i++){ const n=pool.splice(Math.floor(r()*pool.length),1)[0]; let num; do{ num=2+Math.floor(r()*96); }while(used.has(num)); used.add(num); out.push({name:n,num}); }
-  out[5].num=[1,30,31,35,29,40][ti]; return out;
+  out[5].num=[1,30,31,35,29,40][ti];
+  for(const [ab,slot,name,num] of NAMED) if(TEAMS[ti].abbr===ab){
+    for(const o of out) if(o.num===num&&o!==out[slot]){ let n2=num; while(out.some(q=>q.num===n2)) n2=2+(n2+7)%96; o.num=n2; }   // free the number up
+    out[slot]={name,num};
+  }
+  return out;
 }
+// hand-picked players, placed into a team's generated roster
+const NAMED=[['VFC',3,'J. Case',40]];
 const DIFF={
   rookie:{label:'Rookie',spd:.86,acc:.7,aggr:.4,pass:.6,cpuG:.72,humG:1.08,fo:.9},
   pro:{label:'Pro',spd:.95,acc:.9,aggr:.75,pass:.9,cpuG:.86,humG:1.03,fo:.8},
@@ -1906,7 +1913,7 @@ function logo(c,t,size){
   const fo=(col,draw,lw=1.6)=>{ draw(); c.fillStyle=col; c.fill(); c.strokeStyle=K; c.lineWidth=lw; c.stroke(); };
   c.translate(24,24);
   switch(t.abbr){
-    case 'VFF': { // crystal snowflake
+    case 'VFC': { // crystal snowflake
       for(let k=0;k<6;k++){ c.save(); c.rotate(k*Math.PI/3);
         ol(2.2,'#e8f4ff',()=>{ c.beginPath(); c.moveTo(0,0); c.lineTo(0,-12.5); c.moveTo(0,-7); c.lineTo(-3.6,-10); c.moveTo(0,-7); c.lineTo(3.6,-10); c.moveTo(0,-3.6); c.lineTo(-2.4,-5.6); c.moveTo(0,-3.6); c.lineTo(2.4,-5.6); });
         c.restore(); }
