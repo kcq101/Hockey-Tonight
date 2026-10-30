@@ -392,30 +392,173 @@ const DIFF={
   allstar:{label:'All-Star',spd:1.02,acc:1.1,aggr:1.15,pass:1.15,cpuG:.97,humG:.98,fo:.65},
 };
 
-// ---------------- audio ----------------
-const A={ctx:null,on:store.get('blb.snd',true),master:null,crowdG:null,nbuf:null,
+// ---------------- sound ----------------
+// Every effect is synthesized: short samples are baked into AudioBuffers once (on the first tap),
+// then played through an arena bus (compressor + short reverb) with stereo pan by rink position.
+function bakeSfx(c){
+  const SR0=c.sampleRate; let sr=SR0; const R=Math.random, TAU=Math.PI*2, ex=Math.exp, sin=Math.sin, S={};
+  // time-varying state-variable filter (mode 0 low, 1 band, 2 high)
+  const svf=()=>{ let lo=0,bp=0; return (x,fc,q,m)=>{ const f=2*sin(Math.PI*Math.min(fc,sr/6.5)/sr); lo+=f*bp; const hi=x-lo-q*bp; bp+=f*hi; return m===0?lo:m===1?bp:hi; }; };
+  const mk=(sec,ch,fn,pk=.95,fade=true)=>{
+    const n=Math.ceil(sec*sr), d=[]; for(let i=0;i<ch;i++) d.push(new Float32Array(n));
+    fn(d,n);
+    let m=0; for(const a of d) for(let i=0;i<n;i++){ const v=a[i]<0?-a[i]:a[i]; if(v>m) m=v; }
+    const s=m?pk/m:1, fl=fade?Math.min(n,Math.floor(sr*.006)):0, b=c.createBuffer(ch,n,sr);
+    d.forEach((a,k)=>{ for(let j=0;j<n;j++) a[j]*=s; for(let j=0;j<fl;j++) a[n-1-j]*=j/fl; b.getChannelData(k).set(a); });
+    return b;
+  };
+  // seamless loop: render a little extra and crossfade the tail into the head
+  const loop=(sec,ch,gen)=>mk(sec,ch,(d,n)=>{ const m=Math.floor(.12*sr); d.forEach((a,k)=>{ const g=gen(k), t=new Float32Array(n+m); for(let i=0;i<n+m;i++) t[i]=g(i); for(let i=0;i<n;i++) a[i]=i<m?t[i]*(i/m)+t[n+i]*(1-i/m):t[i]; }); },.95,false);
+  // slow random wobble 0..1, new target every `per` seconds
+  const later=[], job=(name,fn)=>later.push([name,()=>{ S[name]=fn(); }]), half=(name,fn)=>later.push([name,()=>{ sr=Math.max(16000,SR0/2); try{ S[name]=fn(); } finally{ sr=SR0; } }]);
+  const wob=(per)=>{ let v=R(),tg=R(),k=0; const N=Math.max(1,Math.floor(per*sr)), a=1/N; return ()=>{ if(++k>=N){ k=0; tg=R(); } v+=(tg-v)*a*3; return v; }; };
+
+  // slapshot: blade digs the ice, then the crack of stick on puck
+  job('crack',()=>mk(.34,1,([a],n)=>{ const f1=svf(),f2=svf(),f3=svf(); let p1=0,p2=0,p3=0;
+    for(let i=0;i<n;i++){ const t=i/sr, w=R()*2-1; let v=t<.024?f1(w,5200,.7,2)*sin(Math.PI*t/.024)*.4:0; const u=t-.022;
+      if(u>=0){ v+=f2(w,3600,.45,1)*ex(-u/.0018)*1.7; p1+=TAU*1250*(1+.18*ex(-u/.004))/sr; v+=sin(p1)*ex(-u/.012)*.85;
+        p2+=TAU*455/sr; v+=sin(p2)*ex(-u/.03)*.45; p3+=TAU*(68+95*ex(-u/.018))/sr; v+=sin(p3)*ex(-u/.055)*.8; v+=f3(w,950,.8,1)*ex(-u/.035)*.35; }
+      a[i]=v; } }));
+  // wrist shot: lighter sweep and snap
+  job('snap',()=>mk(.22,1,([a],n)=>{ const f1=svf(),f2=svf(); let p1=0,p2=0;
+    for(let i=0;i<n;i++){ const t=i/sr, w=R()*2-1; let v=f1(w,4200,.8,2)*ex(-t/.02)*.3*Math.min(1,t/.005); const u=t-.014;
+      if(u>=0){ v+=f2(w,3000,.6,1)*ex(-u/.0013)*1.15; p1+=TAU*1480*(1+.2*ex(-u/.004))/sr; v+=sin(p1)*ex(-u/.008)*.7; p2+=TAU*520/sr; v+=sin(p2)*ex(-u/.02)*.35; }
+      a[i]=v; } }));
+  // pass: crisp wooden tock
+  job('tock',()=>mk(.12,1,([a],n)=>{ const f=svf(); let p1=0,p2=0; for(let i=0;i<n;i++){ const t=i/sr, w=R()*2-1; p1+=TAU*820*(1+.25*ex(-t/.003))/sr; p2+=TAU*2150/sr; a[i]=f(w,2600,.7,1)*ex(-t/.0012)*.9+sin(p1)*ex(-t/.009)+sin(p2)*ex(-t/.003)*.35; } }));
+  // receiving a pass: cushioned, lower
+  job('cat',()=>mk(.12,1,([a],n)=>{ const f=svf(); let p1=0,p2=0; for(let i=0;i<n;i++){ const t=i/sr, w=R()*2-1; p1+=TAU*560/sr; p2+=TAU*180/sr; a[i]=f(w,1500,.8,0)*ex(-t/.004)*.7+sin(p1)*ex(-t/.011)+sin(p2)*ex(-t/.02)*.5; } }));
+  // stickhandling tap
+  job('tap',()=>mk(.06,1,([a],n)=>{ const f=svf(); let p=0; for(let i=0;i<n;i++){ const t=i/sr, w=R()*2-1; p+=TAU*720/sr; a[i]=f(w,2200,.9,1)*ex(-t/.001)*.6+sin(p)*ex(-t/.005); } }));
+  // dasher boards: low boom, knock, rattle
+  job('thud',()=>mk(.6,1,([a],n)=>{ const f=svf(),g=svf(); let p1=0,p2=0; for(let i=0;i<n;i++){ const t=i/sr, w=R()*2-1; p1+=TAU*(62+55*ex(-t/.025))/sr; p2+=TAU*190/sr; const r=.55+.45*sin(TAU*29*t); a[i]=sin(p1)*ex(-t/.12)+sin(p2)*ex(-t/.035)*.45+f(w,1600,.6,1)*ex(-t/.004)*.7+g(w,420,.5,1)*ex(-t/.11)*r*r*.9; } }));
+  // plexiglass: panel flex wobble + bright knock + rattle
+  job('glass',()=>mk(.8,1,([a],n)=>{ const f=svf(),g=svf(); let p1=0,p2=0,p3=0,p4=0; for(let i=0;i<n;i++){ const t=i/sr, w=R()*2-1; p1+=TAU*(118+22*ex(-t/.05))/sr; p2+=TAU*1240/sr; p3+=TAU*1965/sr; p4+=TAU*287/sr;
+    a[i]=sin(p1)*ex(-t/.2)*(1+.5*sin(TAU*9*t))*.9+sin(p2)*ex(-t/.02)*.35+sin(p3)*ex(-t/.012)*.25+sin(p4)*ex(-t/.06)*.4+f(w,2400,.6,1)*ex(-t/.003)*.8+g(w,700,.4,1)*ex(-t/.18)*(.5+.5*sin(TAU*23*t))*.5; } }));
+  // body check: heavy thump + pad crunch
+  job('body',()=>mk(.5,1,([a],n)=>{ const f=svf(),g=svf(); let p=0; for(let i=0;i<n;i++){ const t=i/sr, w=R()*2-1; p+=TAU*(48+70*ex(-t/.02))/sr; a[i]=sin(p)*ex(-t/.13)*1.1+f(w,500,.6,0)*ex(-t/.07)*1.2+g(w,1800,.7,1)*ex(-t/.006)*.6; } }));
+  // goal post: metallic ring
+  job('ping',()=>mk(1.4,1,([a],n)=>{ const P=[[1640,1,.85],[2455,.55,.5],[4120,.3,.25],[5930,.16,.12],[880,.22,.18]], ph=P.map(()=>0);
+    for(let i=0;i<n;i++){ const t=i/sr; let v=(R()*2-1)*ex(-t/.0008)*.8; P.forEach((q,k)=>{ ph[k]+=TAU*q[0]/sr; v+=sin(ph[k])*q[1]*ex(-t/q[2]); }); a[i]=v; } },.9));
+  // goalie pad save: muffled thup
+  job('pad',()=>mk(.25,1,([a],n)=>{ const f=svf(); let p=0; for(let i=0;i<n;i++){ const t=i/sr, w=R()*2-1; p+=TAU*(130+60*ex(-t/.01))/sr; a[i]=f(w,800,.7,0)*ex(-t/.035)*1.4+sin(p)*ex(-t/.05)*.8+w*ex(-t/.0007)*.3; } }));
+  // glove save: leather pop
+  job('glove',()=>mk(.2,1,([a],n)=>{ const f=svf(); let p=0; for(let i=0;i<n;i++){ const t=i/sr, w=R()*2-1; p+=TAU*240/sr; a[i]=f(w,1400,.9,1)*ex(-t/.012)*1.3+sin(p)*ex(-t/.03)*.6+w*ex(-t/.0006)*.4; } }));
+  // poke check: stick-on-stick clack-clack
+  job('clack',()=>mk(.12,1,([a],n)=>{ const f=svf(); let p1=0,p2=0; for(let i=0;i<n;i++){ const t=i/sr, w=R()*2-1, u=t-.022; p1+=TAU*980/sr; let v=sin(p1)*ex(-t/.006)+f(w,3000,.8,1)*ex(-t/.001)*.6; if(u>=0){ p2+=TAU*1320/sr; v+=(sin(p2)*ex(-u/.005)+(R()*2-1)*ex(-u/.0008)*.4)*.75; } a[i]=v; } }));
+  // stick swipe
+  job('swish',()=>mk(.16,1,([a],n)=>{ const f=svf(); for(let i=0;i<n;i++){ const t=i/sr, w=R()*2-1; a[i]=f(w,700+2200*t/.16,2.2,1)*sin(Math.PI*t/.16)**2; } }));
+  // puck hitting the ice
+  job('ice',()=>mk(.12,1,([a],n)=>{ const f=svf(); let p=0; for(let i=0;i<n;i++){ const t=i/sr, w=R()*2-1; p+=TAU*360*(1+.3*ex(-t/.003))/sr; a[i]=f(w,3500,.6,1)*ex(-t/.0015)+sin(p)*ex(-t/.012)*.7; } }));
+  // hockey stop: shhhk
+  job('spray',()=>mk(.42,1,([a],n)=>{ const f=svf(),g=svf(); for(let i=0;i<n;i++){ const t=i/sr, w=R()*2-1, e=t<.03?t/.03:ex(-(t-.03)/.11); a[i]=(f(w,5200,.5,1)*.8+g(w,2600,.9,1)*.5)*e*(.6+.4*R()); } }));
+  // skate carving loop (gain is driven by stride at runtime)
+  job('carve',()=>loop(1.2,1,()=>{ const f=svf(),g=svf(),gr=wob(.03); return ()=>{ const w=R()*2-1; return (f(w,4300,.6,1)+.5*g(w,1800,1.2,1))*(.5+.9*gr()); }; }));
+  // crowd murmur loop (stereo babble)
+  half('bed',()=>loop(3.2,2,()=>{ const B=[[380,1.4,.08],[820,1.6,.11],[1500,1.8,.07],[2600,2,.05]].map(q=>({f:svf(),fc:q[0],q:1/q[1],w:wob(q[2])})), lo=svf();
+    return ()=>{ const w=R()*2-1; let v=lo(w,180,1,0)*.6; for(const b of B) v+=b.f(w,b.fc,b.q,1)*(.25+b.w()); return v; }; }));
+  // goal roar: cheering + clapping + whistles
+  half('roar',()=>mk(3.8,2,(d,n)=>{ d.forEach(a=>{ const f1=svf(),f2=svf(),f3=svf(),cf=svf(),w1=wob(.09),w2=wob(.13); let ce=0,cfq=1500,wp=0,wf=0,wt=-1,wl=0;
+    for(let i=0;i<n;i++){ const t=i/sr, w=R()*2-1, env=t<.22?(t/.22)**1.5:t<2.3?1-.15*(t-.22)/2.08:.85*ex(-(t-2.3)/.55);
+      let v=f1(w,600+150*w1(),.7,1)*1.1+f2(w,1300,.6,1)*.8*w2()+f3(w,2800,.9,1)*.35;
+      if(R()<95/sr){ ce=1; cfq=1100+R()*1400; } v+=cf(w,cfq,.9,1)*ce*1.6; ce*=.996;
+      if(wt<0&&R()<1.2/sr&&t<2.6){ wt=0; wl=.35+R()*.5; wf=1700+R()*900; } if(wt>=0){ wp+=TAU*wf*(1+.06*sin(Math.PI*wt/wl))/sr; v+=sin(wp)*.12*sin(Math.PI*wt/wl); wt+=1/sr; if(wt>wl) wt=-1; }
+      a[i]=v*env; } }); }));
+  // crowd vowel reactions: two swept formants on noise
+  const vowel=(sec,F1,F2,env)=>mk(sec,2,(d,n)=>d.forEach(a=>{ const f=svf(),g=svf(),h=svf(),j=wob(.1); for(let i=0;i<n;i++){ const t=i/sr, x=t/sec, w=R()*2-1; a[i]=(f(w,F1(x)*(1+.03*j()),.22,1)+g(w,F2(x),.3,1)*.6+h(w,2400,.8,1)*.12)*env(t); } }));
+  half('ooh',()=>vowel(1.5,x=>300+260*sin(Math.PI*Math.min(1,x*1.6)),x=>760+260*sin(Math.PI*Math.min(1,x*1.6)),t=>t<.2?t/.2:ex(-(t-.2)/.45)));
+  half('groan',()=>vowel(1.8,x=>650-230*x,x=>1150-350*x,t=>t<.12?t/.12:ex(-(t-.12)/.6)));
+  // referee's pea whistle
+  job('whistle',()=>mk(.62,1,([a],n)=>{ const f=svf(),j=wob(.012); let p=0; for(let i=0;i<n;i++){ const t=i/sr, w=R()*2-1, tr=sin(TAU*31*t+2*j()); p+=TAU*(2870+85*tr)/sr;
+    const e=t<.015?t/.015:t<.44?1:ex(-(t-.44)/.04); a[i]=(sin(p)*(.75+.25*tr)+sin(2*p)*.12+f(w,2900,.25,1)*.35)*e; } }));
+  // goal horn: two detuned air horns from a wavetable, pitch scoop, light saturation
+  half('horn',()=>mk(3.8,1,([a],n)=>{ const L=2048, T=new Float32Array(L+1); for(let i=0;i<=L;i++){ let v=0; for(let k=1;k<=24;k++) v+=sin(TAU*k*i/L)/k**1.05*(1+1.4*ex(-(((k*150-900)/550)**2))); T[i]=v; }
+    const V=[[147,0],[185,1.3],[147.6,2.1]].map(q=>({f:q[0],ph:R(),vp:q[1]}));
+    for(let i=0;i<n;i++){ const t=i/sr; let v=0; for(const o of V){ o.ph+=o.f*(1-.07*ex(-t/.07))*(1+.003*sin(TAU*4.6*t+o.vp))/sr; o.ph-=Math.floor(o.ph); const x=o.ph*L, k=x|0; v+=T[k]+(T[k+1]-T[k])*(x-k); }
+      a[i]=Math.tanh(v*.35)*(t<.08?t/.08:t>3.4?ex(-(t-3.4)/.12):1); } }));
+  // arena reverb impulse response
+  job('ir',()=>mk(1.7,2,(d,n)=>d.forEach(a=>{ let lp=0; const pre=Math.floor(.022*sr), er=[.031,.047,.063,.089,.118].map(x=>[Math.floor(x*sr),.5*R()+.3]);
+    for(let i=pre;i<n;i++){ const t=(i-pre)/sr, k=Math.min(.95,.25+t*.5); lp=lp*k+(R()*2-1)*(1-k); a[i]=lp*ex(-t/.33)*2; } for(const [p,v] of er) if(p<n) a[p]+=v*(R()<.5?-1:1); }),.9));
+  const ord=['ir','carve','tock','cat','tap','ice','crack','snap','whistle','thud','glass','body','pad','glove','clack','swish','spray','ping','horn','roar','ooh','groan','bed'];
+  return {S,later:later.sort((a,b)=>ord.indexOf(a[0])-ord.indexOf(b[0]))};
+}
+const A={ctx:null,on:store.get('blb.snd',true),master:null,S:{},last:{},boost:0,bt:1,acc:0,hk:null,live:null,
   init(){ if(this.ctx) return; try{
-    const C=window.AudioContext||window.webkitAudioContext; const c=this.ctx=new C();
-    this.master=c.createGain(); this.master.gain.value=this.on?.9:0; this.master.connect(c.destination);
-    const n=c.sampleRate*2, b=c.createBuffer(1,n,c.sampleRate), d=b.getChannelData(0); for(let i=0;i<n;i++) d[i]=Math.random()*2-1; this.nbuf=b;
-    const s=c.createBufferSource(); s.buffer=b; s.loop=true; const bp=c.createBiquadFilter(); bp.type='bandpass'; bp.frequency.value=650; bp.Q.value=.6;
-    this.crowdG=c.createGain(); this.crowdG.gain.value=.035; s.connect(bp).connect(this.crowdG).connect(this.master); s.start();
+    const C=window.AudioContext||window.webkitAudioContext; let c; try{ c=new C({latencyHint:'interactive'}); }catch(e){ c=new C(); } this.ctx=c;
+    this.master=c.createGain(); this.master.gain.value=this.on?.9:0;
+    const comp=c.createDynamicsCompressor(); comp.threshold.value=-14; comp.knee.value=10; comp.ratio.value=4; comp.attack.value=.003; comp.release.value=.18;
+    this.master.connect(comp).connect(c.destination);
+    const n=c.sampleRate*.5, b=c.createBuffer(1,n,c.sampleRate), d=b.getChannelData(0); for(let i=0;i<n;i++) d[i]=Math.random()*2-1; this.nbuf=b;
+    const bk=bakeSfx(c); this.S=bk.S;
+    this.rev=c.createConvolver(); const rg=c.createGain(); rg.gain.value=.5; this.rev.connect(rg).connect(this.master);
+    // crowd bed: a calm layer plus a brighter "excited" layer (source starts once its buffer is baked)
+    this.bedG=c.createGain(); this.bedG.gain.value=.04; this.bedG.connect(this.master); const bs=c.createGain(); bs.gain.value=.35; this.bedG.connect(bs).connect(this.rev);
+    this.hp=c.createBiquadFilter(); this.hp.type='highpass'; this.hp.frequency.value=1100; this.hiG=c.createGain(); this.hiG.gain.value=0; this.hp.connect(this.hiG).connect(this.master);
+    // every buffer bakes in the background, one per tick, so the first tap stays snappy
+    const next=()=>{ const j=bk.later.shift(); if(!j) return; try{ j[1](); }catch(e){} if(j[0]==='ir'&&this.S.ir) this.rev.buffer=this.S.ir;
+      if(j[0]==='carve'&&this.S.carve){ runLoop(this.carveG,1); runLoop(this.packG,.86); }
+      if(j[0]==='bed'&&this.S.bed){ const bed=c.createBufferSource(); bed.buffer=this.S.bed; bed.loop=true; bed.connect(this.bedG); bed.connect(this.hp); bed.start(); } setTimeout(next,j[0].length&&this.S[j[0]]&&this.S[j[0]].duration>1?40:8); };
+    setTimeout(next,30);
+    // skates: your skater (panned) and everyone else nearby
+    const mkLoop=()=>{ const g=c.createGain(); g.gain.value=0; return g; }, runLoop=(g,rate)=>{ const s=c.createBufferSource(); s.buffer=this.S.carve; s.loop=true; s.playbackRate.value=rate; s.connect(g); s.start(0,Math.random()); };
+    this.carveG=mkLoop(); this.carveP=c.createStereoPanner?c.createStereoPanner():null; if(this.carveP) this.carveG.connect(this.carveP).connect(this.master); else this.carveG.connect(this.master);
+    this.packG=mkLoop(); this.packG.connect(this.master); const ps=c.createGain(); ps.gain.value=.3; this.packG.connect(ps).connect(this.rev);
   }catch(e){ this.ctx=null; } },
   resume(){ if(this.ctx && this.ctx.state==='suspended') this.ctx.resume(); },
   setOn(v){ this.on=v; store.set('blb.snd',v); if(this.master) this.master.gain.value=v?.9:0; },
-  nz(dur,type,f,q,vol){ const c=this.ctx; if(!c) return; const t=c.currentTime; const s=c.createBufferSource(); s.buffer=this.nbuf; const fl=c.createBiquadFilter(); fl.type=type; fl.frequency.value=f; fl.Q.value=q; const g=c.createGain(); g.gain.setValueAtTime(vol,t); g.gain.exponentialRampToValueAtTime(.001,t+dur); s.connect(fl).connect(g).connect(this.master); s.start(t,Math.random()); s.stop(t+dur+.02); },
-  tn(f,dur,type,vol,to){ const c=this.ctx; if(!c) return; const t=c.currentTime; const o=c.createOscillator(); o.type=type; o.frequency.setValueAtTime(f,t); if(to) o.frequency.exponentialRampToValueAtTime(to,t+dur); const g=c.createGain(); g.gain.setValueAtTime(vol,t); g.gain.exponentialRampToValueAtTime(.001,t+dur); o.connect(g).connect(this.master); o.start(t); o.stop(t+dur+.02); },
-  shot(p){ this.nz(.07,'highpass',2200,.7,.3+.45*p); this.tn(260,.05,'square',.03+.05*p,110); },
-  pass(){ this.nz(.045,'bandpass',1600,1.2,.22); },
-  board(v){ this.nz(.16,'lowpass',260,.8,clamp(v/60,.06,.45)); this.tn(90,.14,'sine',clamp(v/90,.04,.3),55); },
-  check(s){ this.tn(70,.3,'sine',.45+.3*s,32); this.nz(.22,'lowpass',500,.7,.3+.2*s); this.swell(.05+.08*s,.9); },
-  post(){ this.tn(1850,.75,'triangle',.22); this.tn(2780,.5,'sine',.08); this.swell(.1,1); },
-  save(){ this.nz(.09,'bandpass',800,1,.4); this.tn(140,.08,'sine',.2,90); },
-  poke(){ this.nz(.05,'bandpass',2600,2,.2); },
-  drop(){ this.nz(.03,'highpass',3000,1,.25); },
-  whistle(){ const c=this.ctx; if(!c) return; const t=c.currentTime; const o=c.createOscillator(); o.frequency.value=2900; const l=c.createOscillator(); l.frequency.value=28; const lg=c.createGain(); lg.gain.value=140; l.connect(lg).connect(o.frequency); const g=c.createGain(); g.gain.setValueAtTime(.0001,t); g.gain.exponentialRampToValueAtTime(.15,t+.02); g.gain.setValueAtTime(.15,t+.33); g.gain.exponentialRampToValueAtTime(.001,t+.5); o.connect(g).connect(this.master); o.start(t); l.start(t); o.stop(t+.55); l.stop(t+.55); },
-  horn(dur=2.6){ const c=this.ctx; if(!c) return; const t=c.currentTime; const lp=c.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=1100; const g=c.createGain(); g.gain.setValueAtTime(.0001,t); g.gain.exponentialRampToValueAtTime(.2,t+.06); g.gain.setValueAtTime(.2,t+dur-.3); g.gain.exponentialRampToValueAtTime(.001,t+dur); lp.connect(g).connect(this.master); for(const f of [138,174,207,276]){ const o=c.createOscillator(); o.type='sawtooth'; o.frequency.value=f*(1+Math.random()*.004); o.connect(lp); o.start(t); o.stop(t+dur+.05);} this.swell(.25,dur+1.6); },
-  swell(a,d){ if(!this.crowdG) return; const g=this.crowdG.gain, t=this.ctx.currentTime; g.cancelScheduledValues(t); g.setValueAtTime(g.value,t); g.linearRampToValueAtTime(.035+a,t+.15); g.linearRampToValueAtTime(.035,t+d); }
+  // where a sound sits relative to the camera: pan, distance falloff, more reverb when far
+  pos(x,y){ if(!G||x==null) return {pan:0,att:1,wet:.2}; const dx=x-G.camX, dy=y-G.cam, d=hyp(dx*.7,dy); return {pan:clamp(dx/34,-.75,.75),att:clamp(1.15-d/90,.35,1),wet:clamp(.14+d/150,.14,.55)}; },
+  play(name,vol,x,y,o={}){
+    const c=this.ctx, b=this.S[name]; if(!c||!b||!this.on) return null;
+    const now=c.currentTime, gap=o.gap??.035; if(this.last[name]&&now-this.last[name]<gap) return null; this.last[name]=now;
+    const q=this.pos(x,y), s=c.createBufferSource(); s.buffer=b; s.playbackRate.value=o.rate||(.94+Math.random()*.12);
+    const g=c.createGain(); g.gain.value=vol*q.att; s.connect(g); let out=g;
+    if(c.createStereoPanner&&Math.abs(q.pan)>.03){ const p=c.createStereoPanner(); p.pan.value=q.pan; g.connect(p); out=p; }
+    out.connect(this.master); const w=(o.wet??1)*q.wet; if(w>.01&&this.rev){ const sg=c.createGain(); sg.gain.value=w; out.connect(sg).connect(this.rev); }
+    s.start(now+(o.delay||0)); return {s,g,t:now+(o.delay||0)};
+  },
+  nz(dur,type,f,q,vol){ const c=this.ctx; if(!c||!this.on) return; const t=c.currentTime; const s=c.createBufferSource(); s.buffer=this.nbuf; const fl=c.createBiquadFilter(); fl.type=type; fl.frequency.value=f; fl.Q.value=q; const g=c.createGain(); g.gain.setValueAtTime(vol,t); g.gain.exponentialRampToValueAtTime(.001,t+dur); s.connect(fl).connect(g).connect(this.master); s.start(t,Math.random()*.4); s.stop(t+dur+.02); },
+  tn(f,dur,type,vol,to){ const c=this.ctx; if(!c||!this.on) return; const t=c.currentTime; const o=c.createOscillator(); o.type=type; o.frequency.setValueAtTime(f,t); if(to) o.frequency.exponentialRampToValueAtTime(to,t+dur); const g=c.createGain(); g.gain.setValueAtTime(vol,t); g.gain.exponentialRampToValueAtTime(.001,t+dur); o.connect(g).connect(this.master); o.start(t); o.stop(t+dur+.02); },
+  shot(p,x,y){ if(p>.6) this.play('crack',.6+.4*p,x,y,{rate:1.04-.1*p}); else this.play('snap',.45+.5*p,x,y); if(p>.85) this.swell(.08,1); },
+  pass(x,y){ this.play('tock',.55,x,y); },
+  catch(x,y){ this.play('cat',.4,x,y); },
+  board(v,x,y,high){ const k=clamp(v/60,.12,1); this.play('thud',.35+.55*k,x,y,{gap:.06}); if(high||(v>45&&Math.abs(y||0)>RH-RR)) this.play('glass',.25+.5*k,x,y,{gap:.08}); },
+  slam(v,x,y){ const k=clamp(v/35,.4,1); this.play('glass',.5+.4*k,x,y,{gap:.08}); this.play('thud',.55+.35*k,x,y,{gap:.06}); if(k>.7) this.ooh(.4); },
+  check(s,x,y){ this.play('body',.55+.4*Math.min(1,s),x,y,{gap:.05}); if(s>.8){ this.ooh(.55); this.swell(.18,1.4); } else this.swell(.05+.08*s,.9); },
+  post(x,y){ this.play('ping',.75,x,y,{wet:1.4}); this.ooh(.8); },
+  save(x,y,spd=50){ const gl=Math.random()<.4; this.play(gl?'glove':'pad',.4+clamp(spd/90,0,1)*.5,x,y); if(spd>72) this.ooh(.35); },
+  block(x,y){ this.play('body',.5,x,y); this.play('pad',.35,x,y); },
+  poke(x,y){ this.play('clack',.45,x,y); },
+  swish(x,y){ this.play('swish',.28,x,y,{wet:.3}); },
+  spray(x,y,sp){ this.play('spray',clamp(sp/30,.3,.75),x,y,{gap:.12}); },
+  drop(){ this.play('ice',.5); },
+  whistle(){ this.play('whistle',.32,null,null,{wet:1.6,rate:1}); },
+  horn(dur=3.6){ const h=this.play('horn',.5,null,null,{wet:1.5,rate:1}); if(h&&dur<3.6){ const g=h.g.gain; g.setValueAtTime(g.value,h.t+dur-.2); g.linearRampToValueAtTime(0,h.t+dur); h.s.stop(h.t+dur+.05); } this.swell(.25,dur+1.6); },
+  goal(yours){ if(yours){ this.horn(3.6); this.play('roar',.75,null,null,{wet:.6,rate:1}); } else { this.play('groan',.5,null,null,{wet:.6}); this.play('roar',.16,null,null,{wet:.4,delay:.25}); } },
+  ooh(v){ this.play('ooh',.6*v,null,null,{wet:.6,gap:.6}); this.swell(.1*v,1.2); },
+  swell(a,d){ this.boost=Math.min(1.2,Math.max(this.boost,a*4)); this.bt=Math.max(.3,d/3); },
+  // called once per frame: skate carving, stickhandling, crowd intensity
+  tick(dt,live){
+    const c=this.ctx; if(!c||!this.bedG) return; const t=c.currentTime;
+    if(live&&G){
+      const me=(!G.demo&&G.ctrl)||G.P.owner; let mine=0, pack=0, pan=0;
+      for(const p of skaters()){ if(p.down>0) continue; const sp=hyp(p.vx,p.vy); if(sp<2) continue;
+        const push=Math.abs(Math.sin(p.stride))**3, l=clamp(sp/28,0,1.4)*(.25+.75*push)*p.amp;
+        if(p===me){ mine=l; pan=clamp((p.x-G.camX)/34,-.7,.7); } else { const d=hyp(p.x-G.camX,p.y-G.cam); if(d<45) pack+=l*(1-d/45); } }
+      this.carveG.gain.setTargetAtTime(.2*mine*(G.sprint&&me===G.ctrl?1.3:1),t,.012); if(this.carveP) this.carveP.pan.setTargetAtTime(pan,t,.05);
+      this.packG.gain.setTargetAtTime(.07*Math.min(1.6,pack),t,.05);
+      const o=G.P.owner;
+      if(o&&G.phase==='play'&&o.down<=0){ const k=Math.floor(G.t*9/Math.PI); if(this.hk!==null&&k!==this.hk) this.play('tap',o===G.ctrl?.22:.13,G.P.x,G.P.y,{gap:.08,wet:.4}); this.hk=k; } else this.hk=null;
+      this.live=true;
+    } else if(this.live!==false){ this.live=false; this.carveG.gain.setTargetAtTime(0,t,.05); this.packG.gain.setTargetAtTime(0,t,.05); }
+    this.boost*=Math.exp(-dt/this.bt);
+    this.acc+=dt; if(this.acc<.2) return; this.acc=0;
+    let e=screenOpen?.05:live?.3:.15;
+    if(live&&G&&G.phase==='play'){ const P=G.P, f=Math.abs(P.y), z=clamp((f-48)/38,0,1), homeAtk=Math.sign(P.y)===G.home.dir; e+=z*(homeAtk?.4:.22); if(P.shot) e+=.2; }
+    else if(live&&G&&G.phase!=='goal') e-=.08;
+    e+=this.boost;
+    this.bedG.gain.setTargetAtTime(.035+.08*e,t,.35); this.hiG.gain.setTargetAtTime(.09*Math.max(0,e-.35),t,.3);
+  }
 };
 
 // ---------------- music ----------------
@@ -639,7 +782,7 @@ function passTo(from,to){
   releasePuck(from,Math.cos(a)*spd,Math.sin(a)*spd,.25);
   P.pass={from,to,t:0}; pushTouch(from);
   if(from.team.human) setCtrl(to);
-  A.pass();
+  A.pass(P.x,P.y);
 }
 function shoot(p,power,aim,oneT){
   const P=G.P, dir=p.team.dir, gy=dir*GL, g=p.team.opp.goalie;
@@ -666,7 +809,7 @@ function shoot(p,power,aim,oneT){
   P.shot={by:p,team:p.team,oneT,spd,t:0,onNet,d0:hyp(P.x,gy-P.y),gMove:hyp(g.vx,g.vy),move,wrapCross};
   P.lastMove=move; P.lastMoveBy=p; P.lastMoveT=G.t;
   P.pass=null; pushTouch(p);
-  A.shot(power); if(power>.75) G.shake=Math.max(G.shake,.18);
+  A.shot(power,P.x,P.y); if(power>.75) G.shake=Math.max(G.shake,.18);
   if(oneT) floatTxt(p.x,p.y+3,'ONE-TIMER!','#ffb020');
   else if(move==='wrap') floatTxt(p.x,p.y+3,'WRAPAROUND!','#ffb020');
   else if(move==='spin') floatTxt(p.x,p.y+3,'DEKE!','#ffb020');
@@ -687,7 +830,7 @@ function applyHit(c,v){
   const s=clamp(hyp(c.vx,c.vy)/30,.25,1.2), dx=(v.x-c.x)/vd, dy=(v.y-c.y)/vd;
   v.down=.8+s*.7; v.vx+=dx*(9+s*12); v.vy+=dy*(9+s*12); c.vx*=.5; c.vy*=.5;
   if(G.P.owner===v) releasePuck(v,v.vx*.6+rnd(-10,10),v.vy*.6+rnd(-10,10),.4);
-  c.team.hits++; c.hits++; A.check(s); G.shake=Math.max(G.shake,.15+.3*s);
+  c.team.hits++; c.hits++; A.check(s,v.x,v.y); G.shake=Math.max(G.shake,.15+.3*s);
   for(let i=0;i<8;i++) G.parts.push({x:v.x,y:v.y,vx:rnd(-12,12),vy:rnd(-12,12),l:rnd(.3,.6)});
   if(s>.8) floatTxt(v.x,v.y+3,'BIG HIT!','#ff6b5a');
   if(c.team.human||v.team.human) buzz(s>.8?40:20);
@@ -717,7 +860,7 @@ function tryPoke(c){
   c.pokeCool=.5; c.pokeT=.32; c.pokeDone=false;
   const P=G.P; if(hyp(P.x-c.x,P.y-c.y)<10) c.face=Math.atan2(P.y-c.y,P.x-c.x);
   c.vx+=Math.cos(c.face)*3; c.vy+=Math.sin(c.face)*3;
-  A.nz(.08,'bandpass',1300,1.2,.14);
+  A.swish(c.x,c.y);
 }
 function resolvePoke(c){
   c.pokeDone=true;
@@ -732,10 +875,10 @@ function resolvePoke(c){
     if(Math.random()<pr){
       const lat=rnd(-.6,.6);
       releasePuck(o,(fx*14-fy*lat*10)*.65,(fy*14+fx*lat*10)*.65,.45);
-      floatTxt(P.x,P.y+3,'POKE!','#c49bff'); A.poke(); if(c.team.human||o.team.human) buzz(15);
-    } else A.poke();
+      floatTxt(P.x,P.y+3,'POKE!','#c49bff'); A.poke(P.x,P.y); if(c.team.human||o.team.human) buzz(15);
+    } else A.poke(P.x,P.y);
   } else if(!o){
-    P.vx=P.vx*.2-fx*6; P.vy=P.vy*.2-fy*6; P.pass=null; P.shot=null; P.pickBlock=null; A.poke();
+    P.vx=P.vx*.2-fx*6; P.vy=P.vy*.2-fy*6; P.pass=null; P.shot=null; P.pickBlock=null; A.poke(P.x,P.y);
   }
 }
 // spin-o-rama: a full 360 that protects the puck and makes a nearby goalie bite
@@ -840,7 +983,7 @@ function contests(dt){
     const dist=Math.min(hyp(sx-P.x,sy-P.y),hyp(d.x-P.x,d.y-P.y));
     if(dist<2.2){
       let rate=d===G.ctrl?3.2:(d.team.human?1:1.3*D.aggr); if(o===G.ctrl) rate*=.65; if(o.spinT>0) rate*=.2;
-      if(Math.random()<rate*dt){ d.pokeT=.32; d.pokeDone=true; releasePuck(o,0,0,.4); P.owner=null; setOwner(d); A.poke(); return; }
+      if(Math.random()<rate*dt){ d.pokeT=.32; d.pokeDone=true; releasePuck(o,0,0,.4); P.owner=null; setOwner(d); A.poke(P.x,P.y); return; }
     }
     if(d!==G.ctrl && d.checkCool<=0 && hyp(d.x-o.x,d.y-o.y)<4.2){
       const rate=d.team.human?.18:.42*D.aggr;
@@ -872,7 +1015,7 @@ function moveSkater(p,dx,dy,dt){
   let m=hyp(dx,dy); if(m>1){dx/=m;dy/=m;m=1;}
   const max=maxSpd(p)*(G.P.owner===p?.93:1)*(p.homeT>0?1.25:1)*(G.phase==='goal'&&G.cele&&p.team===G.cele.team?1.3:1), sp=hyp(p.vx,p.vy);
   if(m>.05){
-    if(sp>13 && (p.vx*dx+p.vy*dy)/sp<-.35){ p.spray=.15; if(Math.random()<.5) G.parts.push({x:p.x+p.vx*.06,y:p.y+p.vy*.06,vx:p.vx*.4+rnd(-6,6),vy:p.vy*.4+rnd(-6,6),l:rnd(.25,.5)}); }
+    if(sp>13 && (p.vx*dx+p.vy*dy)/sp<-.35){ if(p.spray<=0) A.spray(p.x,p.y,sp); p.spray=.15; if(Math.random()<.5) G.parts.push({x:p.x+p.vx*.06,y:p.y+p.vy*.06,vx:p.vx*.4+rnd(-6,6),vy:p.vy*.4+rnd(-6,6),l:rnd(.25,.5)}); }
     let ax=dx*max-p.vx, ay=dy*max-p.vy; const al=hyp(ax,ay), acc=52*SKATE_PACE*dt*(G.sprint&&p===G.ctrl?2:1)*(p.homeT>0?2:1); if(al>acc){ax*=acc/al;ay*=acc/al;}
     p.vx+=ax; p.vy+=ay;
   } else if(sp>0){ const ns=Math.max(0,sp-(p.down>0?20:13)*dt); p.vx*=ns/sp; p.vy*=ns/sp; }
@@ -882,7 +1025,7 @@ function moveSkater(p,dx,dy,dt){
   else if(p.pokeT>0) ta=null;
   if(ta!==null){ let d=ta-p.face; while(d>Math.PI)d-=2*Math.PI; while(d<-Math.PI)d+=2*Math.PI; const r=10*dt; p.face+=clamp(d,-r,r); }
   const n=rinkConstrain(p,SR);
-  if(n){ const vn=p.vx*n.x+p.vy*n.y; if(vn<0){ p.vx-=1.15*vn*n.x; p.vy-=1.15*vn*n.y; if(vn<-15&&p.down>0){ A.board(-vn); G.shake=Math.max(G.shake,.22); } } }
+  if(n){ const vn=p.vx*n.x+p.vy*n.y; if(vn<0){ p.vx-=1.15*vn*n.x; p.vy-=1.15*vn*n.y; if(vn<-15&&p.down>0){ A.slam(-vn,p.x,p.y); G.shake=Math.max(G.shake,.22); } } }
   netWalls(p,SR,true,0);
   if(p.spray>0) p.spray-=dt;
   const mv=hyp(p.x-ox,p.y-oy);
@@ -953,7 +1096,7 @@ function goalieFree(g,px0,py0){
     pr=clamp(pr,.12,.97);
     if(Math.random()<pr){
       if(sh){ sh.team.shots++; sh.by.sog++; g.saves++; }
-      A.save(); floatTxt(g.x,g.y-side*3,'SAVE!','#9fd3ff');
+      A.save(g.x,g.y,spd); floatTxt(g.x,g.y-side*3,'SAVE!','#9fd3ff');
       if(spd<74 && Math.random()<.55){ freezeBy(g); return true; }
       let vn=P.vx*nx+P.vy*ny; if(vn<0){ P.vx-=2*vn*nx; P.vy-=2*vn*ny; }
       P.vx=P.vx*.38+rnd(-10,10); P.vy=P.vy*.38; if(P.vy*side>-4) P.vy=-side*rnd(6,14);
@@ -966,7 +1109,7 @@ function goalieFree(g,px0,py0){
     if(g.clearCool>0) return false;
     const oppNear=g.team.opp.players.some(o=>o.down<=0&&hyp(o.x-P.x,o.y-P.y)<11);
     if(oppNear||(spd<6&&Math.random()<.4)) freezeBy(g);
-    else { P.vx=(P.x>=g.x?1:-1)*rnd(22,32); P.vy=-side*rnd(4,10); P.shot=null; P.pass=null; P.tried.clear(); g.clearCool=.8; pushTouch(g); A.pass(); }
+    else { P.vx=(P.x>=g.x?1:-1)*rnd(22,32); P.vy=-side*rnd(4,10); P.shot=null; P.pass=null; P.tried.clear(); g.clearCool=.8; pushTouch(g); A.pass(P.x,P.y); }
     return true;
   }
   const nx=(P.x-g.x)/(hyp(P.x-g.x,P.y-g.y)||1), ny=(P.y-g.y)/(hyp(P.x-g.x,P.y-g.y)||1);
@@ -997,7 +1140,7 @@ function goalScored(side){
     $('#goalTxt').innerHTML=(mvName?`<b style="color:var(--led)">${mvName.toUpperCase()}</b> · `:'')+(scorer?`${team.def.abbr} · #${scorer.num} ${scorer.name}${assist?` <span>· ast #${assist.num} ${assist.name}</span>`:' <span>· unassisted</span>'}`:`${team.def.abbr} · own goal`);
     const gb=$('#goal'); gb.classList.remove('on'); void gb.offsetWidth; gb.classList.add('on');
     const l=$('#lamp'); l.classList.remove('on'); void l.offsetWidth; l.classList.add('on');
-    A.horn(3.6); M.duck(5); buzz([60,40,60]);
+    A.goal(team.human); M.duck(5); buzz([60,40,60]);
   }
   G.shake=.45;
   for(let i=0;i<24;i++) G.parts.push({x:P.x,y:P.y,vx:rnd(-20,20),vy:rnd(-20,20),l:rnd(.3,.9)});
@@ -1015,15 +1158,15 @@ function updPuck(dt){
       P.x+=(tx-P.x)*k; P.y+=(ty-P.y)*k; P.vx=o.vx; P.vy=o.vy;
       rinkConstrain(P,PR); netWalls(P,PR,false,0);
       const g=o.team.opp.goalie;
-      if(hyp(P.x-g.x,P.y-g.y)<GR+PR+.15){ const nx=(P.x-g.x), ny=(P.y-g.y), d=hyp(nx,ny)||1; releasePuck(o,nx/d*8,ny/d*8-g.team.dir*-4,.4); A.save(); }
+      if(hyp(P.x-g.x,P.y-g.y)<GR+PR+.15){ const nx=(P.x-g.x), ny=(P.y-g.y), d=hyp(nx,ny)||1; releasePuck(o,nx/d*8,ny/d*8-g.team.dir*-4,.4); A.save(P.x,P.y,12); }
     }
   }
   if(!P.owner){
     P.x+=P.vx*dt; P.y+=P.vy*dt;
     const sp=hyp(P.vx,P.vy); if(sp>0){ const ns=Math.max(0,sp-(2.5+sp*.16)*dt); P.vx*=ns/sp; P.vy*=ns/sp; }
     const n=rinkConstrain(P,PR);
-    if(n){ const vn=P.vx*n.x+P.vy*n.y; if(vn<0){ P.vx-=1.6*vn*n.x; P.vy-=1.6*vn*n.y; if(-vn>16) A.board(-vn); } P.shot=null; }
-    const nh=netWalls(P,PR,false,.45); if(nh>10){ A.board(nh*.6); P.shot=null; }
+    if(n){ const vn=P.vx*n.x+P.vy*n.y; if(vn<0){ P.vx-=1.6*vn*n.x; P.vy-=1.6*vn*n.y; if(-vn>16) A.board(-vn,P.x,P.y,!!P.shot); } P.shot=null; }
+    const nh=netWalls(P,PR,false,.45); if(nh>10){ A.board(nh*.6,P.x,P.y,false); P.shot=null; }
     if(P.shot){ P.shot.t+=dt; if(hyp(P.vx,P.vy)<28) P.shot=null; }
     if(P.pass){ P.pass.t+=dt; if(P.pass.t>2.2||hyp(P.vx,P.vy)<10) P.pass=null; }
   }
@@ -1034,8 +1177,8 @@ function updPuck(dt){
       if(Math.abs(cx)<NW-PR*.5){ goalScored(side); return; }
       if(!P.owner && Math.abs(cx)<NW+PR+.3){
         P.y=side*(GL-.6); P.vy=-P.vy*.45; P.vx+=Math.sign(cx)*rnd(4,12);
-        A.post(); floatTxt(cx,side*(GL-3),'POST!','#ffd36a'); P.shot=null;
-      }
+        A.post(cx,side*GL); floatTxt(cx,side*(GL-3),'POST!','#ffd36a'); P.shot=null;
+      } else if(P.shot&&!P.owner&&Math.abs(cx)<NW+6) A.ooh(.5);
     }
   }
   if(!P.owner){
@@ -1056,7 +1199,7 @@ function updPuck(dt){
           ok=Math.random()<(P.shot?.12:.42)*(s===G.ctrl?1.3:1);
           if(!ok && P.shot && body<SR+PR+.4 && s.team!==P.shot.team){
             const a=Math.atan2(P.vy,P.vx)+Math.PI+rnd(-1.4,1.4), v=hyp(P.vx,P.vy)*.3;
-            P.vx=Math.cos(a)*v; P.vy=Math.sin(a)*v; P.shot=null; A.save(); floatTxt(s.x,s.y+3,'BLOCKED','#cfe3ff');
+            P.vx=Math.cos(a)*v; P.vy=Math.sin(a)*v; P.shot=null; A.block(s.x,s.y); floatTxt(s.x,s.y+3,'BLOCKED','#cfe3ff');
           }
         }
         if(ok){ receive(s); break; }
@@ -1068,6 +1211,7 @@ function receive(s){
   const P=G.P, wasPass=P.pass&&P.pass.to===s;
   setOwner(s);
   if(s===G.ctrl && wasPass && (G.oneT>0||((inp.a.down||inp.y.down)&&!G.charging))){ G.oneT=0; shoot(s,.92,null,true); return; }
+  A.catch(P.x,P.y);
   if(s===G.ctrl && wasPass) G.oneTLate=.25;
   if(!s.team.human && wasPass){ const f=s.y*s.team.dir; if(f>58&&Math.abs(s.x)<22&&Math.random()<.4*(G.demo?1:G.D.aggr)) shoot(s,rnd(.7,1),null,true); }
 }
@@ -1536,7 +1680,7 @@ let last=performance.now();
 let skip=0;
 function frame(now){
   requestAnimationFrame(frame);
-  if(document.hidden||screenOpen) { last=now; return; }
+  if(document.hidden||screenOpen) { A.tick((now-last)/1000,false); last=now; return; }
   if(now-rinkCheckT>1000){ rinkCheckT=now; ensureRink(); }
   let dt=Math.min(.05,(now-last)/1000); last=now;
   if(G && !G.paused && G.phase!=='inter' && G.phase!=='final'){
@@ -1547,8 +1691,8 @@ function frame(now){
     clearEdges();
     const n=2; for(let i=0;i<n;i++) step(dt/n);
     if(G.home.human && G.ctrl && G.P.owner===G.ctrl) G.passHint=pickPassTarget(G.ctrl,stickV()); else G.passHint=null;
-    updateSB(); updateButtons();
-  } else clearEdges();
+    updateSB(); updateButtons(); A.tick(dt,true);
+  } else { clearEdges(); A.tick(dt,false); }
   render();
 }
 
