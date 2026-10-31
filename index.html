@@ -588,7 +588,8 @@ function resize(){
   if(G){ const k=rinkScale().toFixed(1)+G.home.def.abbr; if(k!==rinkKey) buildRink(); }
 }
 let rzT=null; const resizeSoon=()=>{ clearTimeout(rzT); rzT=setTimeout(resize,150); };
-const rinkScale=()=>Math.min(view.sc*view.dpr,14);
+// capped at 10 px per rink foot: the rink and trail canvases are drawn full-screen every frame, and at 14 they were ~1300x2900 each (2x the pixels) - the main cost on phones
+const rinkScale=()=>Math.min(view.sc*view.dpr,10);
 // Mobile browsers can silently wipe off-screen canvases (backgrounding, memory pressure). Detect and redraw.
 let rinkCheckT=0;
 function rinkOk(){ try{ if(!rinkCv.width||!rinkCv.height) return false; const d=rinkCv.getContext('2d').getImageData(rinkCv.width>>1,rinkCv.height>>1,1,1).data; return d[3]>0; }catch(e){ return true; } }
@@ -1561,8 +1562,10 @@ function drawSprite(p){
   const [nm,mir]=pickFrame(p), f=SPR.meta.frames[nm]; if(!f) return false;
   const {sc,dpr}=view, k=(p.g?SPR_GH*PSG:SPR_H*PS)*sc*dpr/(p.g?SPR.meta.hg:SPR.meta.h0);
   const [sx,sy]=W(p.x,p.y), hop=p.celeb&&G.phase==='goal'?Math.abs(Math.sin(G.t*8+p.weave))*.55*sc*dpr:0;
-  ctx.save(); ctx.setTransform(1,0,0,1,0,0); ctx.imageSmoothingEnabled=true; ctx.imageSmoothingQuality='high';
+  ctx.save(); ctx.setTransform(1,0,0,1,0,0); ctx.imageSmoothingEnabled=true; ctx.imageSmoothingQuality='low';   // 'high' is a slow resampler on Android Chrome, paid per skater per frame
   ctx.translate(sx*dpr,sy*dpr+.25*PS*sc*dpr-hop);
+  // stride lean: the body rocks smoothly side to side with each push, so motion reads as continuous between the 4 drawn leg poses
+  if(!p.g&&p.down<=0&&p.amp>.22&&nm.startsWith('run_')) ctx.rotate(Math.sin(p.stride)*.07*p.amp);
   if(p.down>0) ctx.rotate((p.face>-Math.PI/2&&p.face<Math.PI/2?1:-1)*1.25);   // knocked down: lying on the ice
   if(mir) ctx.scale(-1,1);
   ctx.drawImage(kit,f[0],f[1],f[2],f[3],-f[4]*k,-f[3]*k,f[2]*k,f[3]*k);
@@ -1686,14 +1689,30 @@ function drawNet(side){
   outline(0,0); ctx.lineWidth=.18; ctx.stroke();
   if(far) frame();
 }
+// ice sheen highlight, rendered once and reused (was a new radial gradient for every highlight, every frame)
+let sheenCv=null;
+function sheenSprite(){
+  if(sheenCv) return sheenCv;
+  sheenCv=document.createElement('canvas'); sheenCv.width=sheenCv.height=128; const x=sheenCv.getContext('2d');
+  const g=x.createRadialGradient(64,64,0,64,64,64); g.addColorStop(0,'rgba(255,255,255,.55)'); g.addColorStop(.18,'rgba(250,253,255,.28)'); g.addColorStop(.55,'rgba(225,240,255,.08)'); g.addColorStop(1,'rgba(225,240,255,0)');
+  x.fillStyle=g; x.fillRect(0,0,128,128); return sheenCv;
+}
+// screen vignette, rendered once per screen size at quarter resolution (it's a soft gradient, so upscaling is invisible)
+let vigCv=null, vigKey='';
+function vignette(cw,ch){
+  const key=cw+'x'+ch; if(vigCv&&vigKey===key) return vigCv;
+  vigKey=key; vigCv=document.createElement('canvas'); const q=4, w=Math.max(1,Math.ceil(cw/q)), h=Math.max(1,Math.ceil(ch/q));
+  vigCv.width=w; vigCv.height=h; const x=vigCv.getContext('2d');
+  const g=x.createRadialGradient(w/2,h/2,Math.min(w,h)*.35,w/2,h/2,Math.max(w,h)*.75); g.addColorStop(0,'rgba(8,24,44,0)'); g.addColorStop(1,'rgba(8,24,44,.28)');
+  x.fillStyle=g; x.fillRect(0,0,w,h); return vigCv;
+}
 function drawSheen(){
   ctx.save(); rrPath(ctx,RW,RH,RR); ctx.clip();
   const vh=view.ch/2/(view.sc*TILT)+14;
   for(const Lx of [-21,0,21]) for(let Ly=-87;Ly<=87;Ly+=29){
     const rx=Lx+(Lx-G.camX)*.5, ry=Ly+(Ly-G.cam)*.5; if(Math.abs(ry-G.cam)>vh) continue;
     ctx.save(); ctx.translate(rx,ry); ctx.scale(.5,1);
-    const g=ctx.createRadialGradient(0,0,0,0,0,11); g.addColorStop(0,'rgba(255,255,255,.55)'); g.addColorStop(.18,'rgba(250,253,255,.28)'); g.addColorStop(.55,'rgba(225,240,255,.08)'); g.addColorStop(1,'rgba(225,240,255,0)');
-    ctx.fillStyle=g; ctx.fillRect(-11,-11,22,22); ctx.restore();
+    ctx.drawImage(sheenSprite(),-11,-11,22,22); ctx.restore();
   }
   ctx.restore();
 }
@@ -1759,7 +1778,7 @@ function render(){
   for(const q of G.parts){ ctx.fillStyle=`rgba(245,250,255,${clamp(q.l*1.5,0,.85)})`; ctx.beginPath(); ctx.arc(q.x,q.y,.14+q.l*.12,0,7); ctx.fill(); }
   // screen-space overlays
   ctx.setTransform(dpr,0,0,dpr,0,0);
-  const vg=ctx.createRadialGradient(cw/2,ch/2,Math.min(cw,ch)*.35,cw/2,ch/2,Math.max(cw,ch)*.75); vg.addColorStop(0,'rgba(8,24,44,0)'); vg.addColorStop(1,'rgba(8,24,44,.28)'); ctx.fillStyle=vg; ctx.fillRect(0,0,cw,ch);
+  ctx.drawImage(vignette(cw,ch),0,0,cw,ch);
   ctx.textAlign='center'; ctx.textBaseline='middle';
   if(!G.demo){
     if(G.passHint && P.owner===G.ctrl){ const [hx,hy]=W(G.passHint.x,G.passHint.y+(SPR_H*PS+1.2)/TILT); const b=Math.sin(G.t*8)*2; ctx.fillStyle='#5fb8ff'; ctx.beginPath(); ctx.moveTo(hx-6,hy-6+b); ctx.lineTo(hx+6,hy-6+b); ctx.lineTo(hx,hy+2+b); ctx.closePath(); ctx.fill(); }
