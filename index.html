@@ -1809,9 +1809,9 @@ function drawPuck(P){
     ctx.lineCap='round'; for(let i=1;i<=4;i++){ ctx.strokeStyle=`rgba(30,40,55,${.14/i})`; ctx.lineWidth=(.9-i*.12)*PV; ctx.beginPath(); ctx.moveTo(px,y); ctx.lineTo(px-P.vx*.02*i,y-P.vy*.02*i); ctx.stroke(); }
   }
   blob(px+.25*PV+z*.25,py-.22*PV,(.62+z*.15)*PV,(.5+z*.1)*PV,'#14283f',.45-z*.1);
-  const r=(.42+z*.05)*PV, th=.44, rr=r+.14*PV;     // th = puck thickness in world-y: a short cylinder seen from the broadcast camera
-  // light rim around the whole silhouette: keeps it readable against skates, shadows and ice lines
-  ctx.fillStyle='rgba(255,255,255,.9)'; ctx.beginPath(); ctx.arc(px,y-th,rr,0,7); ctx.fill(); ctx.beginPath(); ctx.arc(px,y,rr,0,7); ctx.fill(); ctx.fillRect(px-rr,y-th,rr*2,th);
+  const r=(.42+z*.05)*PV, th=.44, rr=r+.035*PV;     // th = puck thickness in world-y: a short cylinder seen from the broadcast camera
+  // very thin, faint light rim around the silhouette (just enough to separate it from dark skates)
+  ctx.fillStyle='rgba(255,255,255,.45)'; ctx.beginPath(); ctx.arc(px,y-th,rr,0,7); ctx.fill(); ctx.beginPath(); ctx.arc(px,y,rr,0,7); ctx.fill(); ctx.fillRect(px-rr,y-th,rr*2,th);
   // side wall: lit from the upper left, dark on the right
   const sg=ctx.createLinearGradient(px-r,0,px+r,0); sg.addColorStop(0,'#4a5059'); sg.addColorStop(.4,'#23272c'); sg.addColorStop(1,'#08090b');
   ctx.fillStyle='#08090b'; ctx.beginPath(); ctx.arc(px,y-th,r,0,7); ctx.fill();
