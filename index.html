@@ -375,7 +375,7 @@ const buzz = ms => { try{ navigator.vibrate && navigator.vibrate(ms); }catch(e){
 function mulberry(a){ return function(){ a|=0; a=a+0x6D2B79F5|0; let t=Math.imul(a^a>>>15,1|a); t=t+Math.imul(t^t>>>7,61|t)^t; return ((t^t>>>14)>>>0)/4294967296; }; }
 
 // ---------------- rink geometry (feet) ----------------
-const RW=42.5, RH=100, RR=28, GL=89, NW=3, ND=3.4, PR=0.5, SR=1.6, GR=2.5;
+const RW=42.5, RH=100, RR=28, GL=89, NW=3.3, ND=3.6, PR=0.5, SR=1.6, GR=2.5;
 
 // ---------------- teams ----------------
 const TEAMS=[
@@ -699,7 +699,11 @@ function buildRink(){
   }
   for(const side of [1,-1]){
     const gy=side*GL;
-    c.beginPath(); if(side>0){ c.moveTo(-4,gy); c.arc(0,gy,6,Math.PI*1.16,Math.PI*1.84); c.lineTo(4,gy); } else { c.moveTo(4,gy); c.arc(0,gy,6,Math.PI*.16,Math.PI*.84); c.lineTo(-4,gy); } c.closePath();
+    // crease: a near-semicircle (radius CW) whose short straight sides run out from the goal line parallel to the net, no flare
+    const CW=5, CL=.8; c.beginPath();
+    if(side>0){ c.moveTo(-CW,gy); c.lineTo(-CW,gy-CL); c.arc(0,gy-CL,CW,Math.PI,Math.PI*2); c.lineTo(CW,gy); }
+    else { c.moveTo(CW,gy); c.lineTo(CW,gy+CL); c.arc(0,gy+CL,CW,0,Math.PI); c.lineTo(-CW,gy); }
+    c.closePath();
     c.fillStyle='rgba(70,150,230,.42)'; c.fill(); c.strokeStyle=RED; c.lineWidth=.17; c.stroke();
     c.beginPath(); c.moveTo(-11,gy); c.lineTo(-14,side*RH); c.moveTo(11,gy); c.lineTo(14,side*RH); c.stroke();
   }
@@ -1548,7 +1552,7 @@ function drawSkaterVec(p){
 //   2. animation:  pickFrame() turns gameplay state (facing, stride, shot/pass/poke/check timers) into a frame name
 //   3. movement:   untouched - moveSkater()/physics only ever feed the timers pickFrame reads
 // If the atlas hasn't loaded (or fails), drawSkaterVec() draws the old vector players instead.
-const SPR_H=4.75, SPR_GH=5.1;      // on-screen height in world units: skater standing, goalie in his stance
+const SPR_H=4.5, SPR_GH=5.6;      // on-screen height in world units: skater standing, goalie in his stance
 const CLASSIC=/[?&]classic\b/.test(location.search);   // ?classic = original 2D sprites and controls
 const SPR={img:null,meta:null,kits:new Map(),img3:null,meta3:null,kits3:new Map()};
 (function(){ fetch('img/sk/atlas.json').then(r=>r.json()).then(m=>{ const im=new Image(); im.decoding='async';
