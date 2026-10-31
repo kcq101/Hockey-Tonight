@@ -1,0 +1,50 @@
+<!doctype html><meta charset=utf-8><body style="margin:0;background:transparent">
+<canvas id=c width=900 height=900></canvas>
+<script type="importmap">{"imports":{"three":"./node_modules/three/build/three.module.js","three/addons/":"./node_modules/three/examples/jsm/"}}</script>
+<script type="module">
+import * as THREE from 'three';
+import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
+const V=(x,y,z)=>new THREE.Vector3(x,y,z), Q=THREE.Quaternion, N=900;
+const cv=document.getElementById('c');
+const r=new THREE.WebGLRenderer({canvas:cv,antialias:true,alpha:true,preserveDrawingBuffer:true});
+r.setSize(N,N,false); r.outputColorSpace=THREE.SRGBColorSpace; r.setClearColor(0,0);
+const g=await new GLTFLoader().loadAsync('m.glb');
+const sc=new THREE.Scene(); sc.add(new THREE.AmbientLight(0xffffff,1.7)); const dl=new THREE.DirectionalLight(0xffffff,1.7); dl.position.set(-2.5,2.5,1.5); sc.add(dl);
+const root=g.scene; sc.add(root);
+const B={}; root.traverse(o=>{ if(o.isBone) B[o.name.replace(/^mixamorig:?/,'')]=o; });
+const mx=new THREE.AnimationMixer(root);
+const wp=b=>b.getWorldPosition(V(0,0,0));
+function applyW(bone,q){ const w=new Q(); bone.getWorldQuaternion(w); const nw=q.clone().multiply(w); const p=new Q(); bone.parent.getWorldQuaternion(p); bone.quaternion.copy(p.invert().multiply(nw)); bone.updateMatrixWorld(true); }
+function aim(bone,from,to,pivot){ const q=new Q().setFromUnitVectors(from.clone().sub(pivot).normalize(),to.clone().sub(pivot).normalize()); applyW(bone,q); }
+function ik2(A,Bm,C,target,pole){
+  const a=wp(A),b=wp(Bm),c=wp(C),l1=a.distanceTo(b),l2=b.distanceTo(c);
+  const t=target.clone().sub(a); let d=Math.min(t.length(),l1+l2-1e-3); d=Math.max(d,Math.abs(l1-l2)+1e-3);
+  const dir=t.clone().normalize(); const x=(l1*l1-l2*l2+d*d)/(2*d), h=Math.sqrt(Math.max(0,l1*l1-x*x));
+  const pv=pole.clone().sub(dir.clone().multiplyScalar(pole.dot(dir))).normalize();
+  const e=a.clone().add(dir.clone().multiplyScalar(x)).add(pv.multiplyScalar(h));
+  aim(A,b,e,a);
+  const endT=a.clone().add(dir.clone().multiplyScalar(d)); aim(Bm,wp(C),endT,wp(Bm));
+}
+// side camera: fighter faces screen-right, turned a little toward us so chests read
+const AZ=(window.AZ??8)*Math.PI/180, EL=8*Math.PI/180, HW=1.45;
+const C=new THREE.OrthographicCamera(-HW,HW,HW,-HW,.1,50);
+const tgt=V(0.0,1.05,0.25);
+C.position.set(-Math.cos(AZ)*Math.cos(EL)*8,Math.sin(EL)*8,Math.sin(AZ)*Math.cos(EL)*8).add(tgt); C.lookAt(tgt); C.updateProjectionMatrix();
+const pj=v=>{const p=v.clone().project(C); return [(p.x*.5+.5)*N,(1-(p.y*.5+.5))*N];};
+function pose(name,t,o={}){
+  mx.stopAllAction(); const clip=g.animations.find(c=>c.name===name); const a=mx.clipAction(clip); a.reset().play(); mx.setTime(Math.min(t,clip.duration-1e-4)); root.rotation.y=({Idle_10:22,Dead:-66,Show_Both_Arm_Muscles:-50,Face_Punch_Reaction:-14}[name]||0)*Math.PI/180;
+  root.updateMatrixWorld(true);
+  B.Head.scale.setScalar(1.12); B.LeftHand.scale.setScalar(1.25); B.RightHand.scale.setScalar(1.25); root.updateMatrixWorld(true);
+  if(o.grab){ // fake the jersey grab: lead (left) hand pinned on the other guy's shoulder/collar
+    const D=window.DIST||1.0; const k=o.grab;
+    const cur=wp(B.LeftHand), T=V(0.12,1.36,D-0.24);
+    const tt=cur.clone().lerp(T,k);
+    ik2(B.LeftArm,B.LeftForeArm,B.LeftHand,tt,V(0.6,-0.8,0));
+  }
+}
+window.yaws=(t0)=>g.animations.map(c=>{ pose(c.name,t0||0); const f=(a,b)=>{const L=wp(B[a]).sub(wp(B[b])); const F=L.clone().cross(V(0,1,0)); return +(Math.atan2(F.x,F.z)*57.3).toFixed(1);}; return [c.name,f('LeftUpLeg','RightUpLeg'),f('LeftArm','RightArm')]; });
+window.info=()=>g.animations.map(c=>[c.name,c.duration]);
+window.measure=(name,n)=>{ const clip=g.animations.find(c=>c.name===name); const out=[]; for(let i=0;i<=n;i++){ const t=clip.duration*i/n; pose(name,t); out.push([+t.toFixed(2),...['RightHand','LeftHand','Hips','Head'].map(k=>{const p=wp(B[k]);return [+p.x.toFixed(2),+p.y.toFixed(2),+p.z.toFixed(2)];})]); } return out; };
+window.shot=(name,t,o)=>{ pose(name,t,o||{}); r.render(sc,C); return {img:cv.toDataURL('image/png'),anchor:pj(V(0,0,0)),hand:[pj(wp(B.RightHand)),pj(wp(B.LeftHand))],head:pj(wp(B.Head))}; };
+window.ready=true;
+</script>

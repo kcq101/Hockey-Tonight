@@ -32,6 +32,19 @@ On defense the bottom and right buttons turn red and read "Check" when a body ch
 
 Tap a teammate on the ice to pass to him.
 
+### Fights
+
+Big hits build bad blood. Once a team has taken enough, the next solid hit can start a fight (at most one a period, two a game; never in the last minute of a close third). Play stops, the gear comes off, and the camera cuts to a side-on fight cam:
+
+| Button | In a fight |
+|---|---|
+| Left | Jab |
+| Right | Haymaker (slow, hits hard, steps in; breaks a grab) |
+| Bottom | Block (hold) |
+| Top | Grab his jersey; press again to pull him off balance for a free shot |
+
+First one out of stamina goes down. After 14 seconds the linesmen step in. Leave the buttons alone and your guy fights on his own.
+
 Keyboard: WASD/arrows; J = top, U = left, K or Space = right, L or Shift = bottom; P pause.
 
 ## Project layout
@@ -52,3 +65,10 @@ Players are drawn from `img/sk/atlas.webp` (+ `atlas.json`), built from the key-
 (magenta = jersey, cyan = stripes, lime = helmet/gloves/pants). The game recolours the atlas for the two teams
 at the start of each match. To rebuild after changing the art: `python3 tools/build_sprites.py`
 (needs Pillow, NumPy and SciPy). `art/src/` is never loaded by the game.
+
+## Fight sprites
+`img/sk/fight.webp/json` is a side-view set rendered from the Meshy fight GLB (same key colours and Mixamo rig; helmetless,
+bare fists). The jersey grab is faked with two-bone IK on the lead arm. To rebuild: put the GLB at `m.glb` next to
+`tools/fight/fight.html` with three@0.160.0 installed, serve that folder on port 8811, `python3 tools/fight/jobs.py`,
+`node tools/fight/rend.js jobs.json fr`, then `python3 tools/build_fight_sprites.py fr img/sk 0.6 90`.
+The GLB itself is not in the repo (14 MB); the game only loads the 770 KB atlas, a moment after a match starts.
