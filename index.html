@@ -669,7 +669,7 @@ function buildRink(){
   // ice base
   rrPath(c,RW,RH,RR);
   const ig=c.createLinearGradient(-RW,0,RW,0);
-  ig.addColorStop(0,'#bcd5e8'); ig.addColorStop(.14,'#d4e5f2'); ig.addColorStop(.5,'#e4eff8'); ig.addColorStop(.86,'#d4e5f2'); ig.addColorStop(1,'#bcd5e8');
+  ig.addColorStop(0,'#b4d2ea'); ig.addColorStop(.14,'#cce2f4'); ig.addColorStop(.5,'#dbeaf8'); ig.addColorStop(.86,'#cce2f4'); ig.addColorStop(1,'#b4d2ea');
   c.fillStyle=ig; c.fill(); c.save(); c.clip();
   const vg=c.createLinearGradient(0,-RH,0,RH); vg.addColorStop(0,'rgba(90,150,210,.16)'); vg.addColorStop(.5,'rgba(255,255,255,0)'); vg.addColorStop(1,'rgba(90,150,210,.16)');
   c.fillStyle=vg; c.fillRect(-RW,-RH,2*RW,2*RH);
@@ -708,7 +708,7 @@ function buildRink(){
     c.beginPath(); c.moveTo(-11,gy); c.lineTo(-14,side*RH); c.moveTo(11,gy); c.lineTo(14,side*RH); c.stroke();
   }
   // a clear layer of ice over the paint
-  c.fillStyle='rgba(220,236,248,.2)'; c.fillRect(-RW,-RH,2*RW,2*RH);
+  c.fillStyle='rgba(208,232,250,.22)'; c.fillRect(-RW,-RH,2*RW,2*RH);
   // fine hairline scratches and frost glints
   for(let i=0;i<2600;i++){ const x=-RW+nr()*2*RW, y=-RH+nr()*2*RH, a=nr()*Math.PI*2, l=.5+nr()*2.6;
     c.strokeStyle=nr()<.65?`rgba(255,255,255,${.1+nr()*.18})`:`rgba(120,155,185,${.03+nr()*.05})`; c.lineWidth=.025+nr()*.035;
@@ -1852,7 +1852,10 @@ function render(){
   const wt=()=>ctx.setTransform(dpr*sc,0,0,-dpr*sc*TILT,dpr*(cw/2-G.camX*sc+G.sx),dpr*(ch/2+G.cam*sc*TILT+G.sy));
   wt(); drawSheen();
   const P=G.P;
-  if(G.phase==='goal'&&G.cele){ const sd=G.cele.side, pulse=.5+.5*Math.sin(G.t*13); blob(0,sd*(GL+ND+3),13,8,'#ff2020',.25+.4*pulse); blob(0,sd*(GL+1),9,6,'#ff4040',.12+.22*pulse); ctx.fillStyle=pulse>.5?'#ff3030':'#9a1010'; rrect(-1.6,sd*(RH+.6)+GH*HZ-.2,3.2,1,.3); ctx.fill(); }
+  if(G.phase==='goal'&&G.cele){ const sd=G.cele.side, pulse=.5+.5*Math.sin(G.t*13); blob(0,sd*(GL+ND+3),13,8,'#ff2020',.25+.4*pulse); blob(0,sd*(GL+1),9,6,'#ff4040',.12+.22*pulse); const on=Math.sin(G.t*14)>0, ly=sd*(GL+ND*.8)+(GH+1.2)*HZ, lx=NW+2.6; blob(lx,ly,on?7:4,on?5:3,'#ff2a2a',on?.55:.18);
+    ctx.fillStyle='#2a2d33'; rrect(lx-1.5,ly-1.2,3,.9,.3); ctx.fill();
+    ctx.fillStyle=on?'#ff4a4a':'#7a1212'; ctx.beginPath(); ctx.ellipse(lx,ly+.1,1.3,1.1,0,0,7); ctx.fill();
+    if(on){ ctx.fillStyle='rgba(255,230,230,.9)'; ctx.beginPath(); ctx.ellipse(lx-.35,ly+.35,.4,.3,0,0,7); ctx.fill(); } }
   // far-to-near so nearer bodies overlap farther ones; nets and the puck sort in with the players
   const list=skaters().concat([G.home.goalie,G.away.goalie]); list.push({net:1,y:GL},{net:-1,y:-GL},{puck:true,y:P.owner?P.owner.y-.05:P.y});
   list.sort((a,b)=>b.y-a.y);
