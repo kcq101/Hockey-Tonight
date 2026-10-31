@@ -1,0 +1,73 @@
+<!doctype html><meta charset=utf-8><body style="margin:0;background:transparent">
+<canvas id=c width=1100 height=1100></canvas>
+<script type="importmap">{"imports":{"three":"./node_modules/three/build/three.module.js","three/addons/":"./node_modules/three/examples/jsm/"}}</script>
+<script type="module">
+import * as THREE from 'three';
+import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
+const V=(x,y,z)=>new THREE.Vector3(x,y,z), Q=THREE.Quaternion;
+const cv=document.getElementById('c');
+const r=new THREE.WebGLRenderer({canvas:cv,antialias:true,alpha:true,preserveDrawingBuffer:true});
+r.setSize(1100,1100,false); r.outputColorSpace=THREE.SRGBColorSpace; r.setClearColor(0,0);
+const g=await new GLTFLoader().loadAsync('m.glb');
+const sc=new THREE.Scene(); sc.add(new THREE.AmbientLight(0xffffff,1.7)); const dl=new THREE.DirectionalLight(0xffffff,1.7); dl.position.set(-1.2,2.5,2.5); sc.add(dl);
+const rig=new THREE.Group(); sc.add(rig); const root=g.scene; rig.add(root); const stick=new THREE.Group(); rig.add(stick);
+const B={}; root.traverse(o=>{ if(o.isBone) B[o.name.replace(/^mixamorig:?/,'')]=o; });
+const rest=new Map(); root.traverse(o=>rest.set(o,[o.position.clone(),o.quaternion.clone(),o.scale.clone()]));
+root.updateMatrixWorld(true);
+const restW={}; for(const k in B){ const q=new Q(); B[k].getWorldQuaternion(q); restW[k]=q; }
+const restP={}; for(const k in B){ restP[k]=B[k].getWorldPosition(V(0,0,0)); }
+const wp=b=>b.getWorldPosition(V(0,0,0));
+function applyW(bone,q){ const w=new Q(); bone.getWorldQuaternion(w); const nw=q.clone().multiply(w); const p=new Q(); bone.parent.getWorldQuaternion(p); bone.quaternion.copy(p.invert().multiply(nw)); bone.updateMatrixWorld(true); }
+function setW(bone,nw){ const p=new Q(); bone.parent.getWorldQuaternion(p); bone.quaternion.copy(p.invert().multiply(nw)); bone.updateMatrixWorld(true); }
+const aax=(ax,a)=>new Q().setFromAxisAngle(ax,a);
+function aim(bone,from,to,pivot){ const q=new Q().setFromUnitVectors(from.clone().sub(pivot).normalize(),to.clone().sub(pivot).normalize()); applyW(bone,q); }
+function ik2(A,Bm,C,target,pole){
+  const a=wp(A),b=wp(Bm),c=wp(C),l1=a.distanceTo(b),l2=b.distanceTo(c);
+  const t=target.clone().sub(a); let d=Math.min(t.length(),l1+l2-1e-3); d=Math.max(d,Math.abs(l1-l2)+1e-3);
+  const dir=t.clone().normalize(); const x=(l1*l1-l2*l2+d*d)/(2*d), h=Math.sqrt(Math.max(0,l1*l1-x*x));
+  const pv=pole.clone().sub(dir.clone().multiplyScalar(pole.dot(dir))).normalize();
+  const e=a.clone().add(dir.clone().multiplyScalar(x)).add(pv.multiplyScalar(h));
+  aim(A,b,e,a);
+  const endT=a.clone().add(dir.clone().multiplyScalar(d)); aim(Bm,wp(C),endT,wp(Bm));
+}
+function pose(o){ // o: {phi,u,yaw,lean,low}
+  root.traverse(n=>{const s=rest.get(n); if(s){n.position.copy(s[0]);n.quaternion.copy(s[1]);n.scale.copy(s[2]);}}); rig.rotation.set(0,0,0); root.updateMatrixWorld(true);
+  B.Head.scale.multiplyScalar(1.16); B.LeftHand.scale.multiplyScalar(1.22); B.RightHand.scale.multiplyScalar(1.22); root.updateMatrixWorld(true);
+  const phi=o.phi, psR=Math.max(0,Math.sin(phi)), psL=Math.max(0,-Math.sin(phi));
+  const lean=o.lean??0.20, low=(o.low??0.22)+0.04*(psR+psL);
+  const hp=wp(B.Hips); const target=hp.clone().add(V(0,-low,0.05)); B.Hips.position.copy(B.Hips.parent.worldToLocal(target.clone())); root.updateMatrixWorld(true);
+  const X=V(1,0,0), Y=V(0,1,0);
+  applyW(B.Hips,aax(X,0.20+(lean-0.20)*0.6));
+  applyW(B.Spine,aax(X,lean)); applyW(B.Spine1,aax(X,lean*.8)); applyW(B.Spine2,aax(X,lean*.6));
+  applyW(B.Spine1,aax(Y,-(o.u-0.55)*0.30));
+  applyW(B.Neck,aax(X,-0.28-(lean-0.2)*.8)); applyW(B.Head,aax(X,-0.22-(lean-0.2)*.6));
+  const fL=restP.LeftFoot.clone(), fR=restP.RightFoot.clone();
+  const dR=[-0.05-0.30*psR, 0.03*psR, -0.50*psR+0.16*psL, -0.55*psR];
+  const dL=[0.05+0.30*psL, 0.03*psL, -0.50*psL+0.16*psR, 0.55*psL];
+  const tgtL=fL.clone().add(V(dL[0],dL[1],dL[2])), tgtR=fR.clone().add(V(dR[0],dR[1],dR[2]));
+  ik2(B.LeftUpLeg,B.LeftLeg,B.LeftFoot,tgtL,V(0.15,0.2,1)); ik2(B.RightUpLeg,B.RightLeg,B.RightFoot,tgtR,V(-0.15,0.2,1));
+  setW(B.LeftFoot,aax(Y,dL[3]).multiply(restW.LeftFoot)); setW(B.RightFoot,aax(Y,dR[3]).multiply(restW.RightFoot));
+  const P=V(-o.u,0.0,0.98), T=V(0.10,0.86,0.40+(lean-0.2)*0.4);
+  const dir=P.clone().sub(T).normalize(), dist=P.distanceTo(T);
+  const butt=T.clone().sub(dir.clone().multiplyScalar(0.10)), low2=T.clone().add(dir.clone().multiplyScalar(0.46));
+  root.updateMatrixWorld(true);
+  ik2(B.LeftArm,B.LeftForeArm,B.LeftHand,T.clone().add(V(0,-0.02,0)),V(0.7,-0.6,-0.2));
+  ik2(B.RightArm,B.RightForeArm,B.RightHand,low2,V(-0.7,-0.6,-0.2));
+  while(stick.children.length) stick.remove(stick.children[0]);
+  const m1=new THREE.MeshStandardMaterial({color:0x17191e,roughness:.7}), m2=new THREE.MeshStandardMaterial({color:0xf0efe8,roughness:.8}), m3=new THREE.MeshStandardMaterial({color:0x17191e,roughness:.7});
+  const L=butt.distanceTo(P); const sh=new THREE.Mesh(new THREE.CylinderGeometry(0.030,0.030,L,10),m1);
+  sh.position.copy(butt.clone().add(P).multiplyScalar(.5)); sh.quaternion.setFromUnitVectors(V(0,1,0),P.clone().sub(butt).normalize()); stick.add(sh);
+  const bd=V(P.x-T.x,0,P.z-T.z).normalize(); const ba=Math.atan2(bd.x,bd.z);
+  const bl=new THREE.Mesh(new THREE.BoxGeometry(0.06,0.11,0.30),m2); bl.position.set(P.x+bd.x*0.12,0.055,P.z+bd.z*0.12); bl.rotation.y=ba; stick.add(bl);
+  rig.rotation.y=o.yaw; rig.updateMatrixWorld(true);
+  return P;
+}
+function cam(){const e=46*Math.PI/180; const c=new THREE.OrthographicCamera(-1.84,1.84,1.84,-1.84,.1,50); c.position.set(0,Math.sin(e)*8,Math.cos(e)*8); c.lookAt(0,0,0); c.position.y+=0; c.lookAt(0,0.0,0); c.zoom=1; 
+  // shift view up so feet sit near bottom: use view offset
+  c.updateProjectionMatrix(); return c;}
+const C=cam();
+window.shot=(o)=>{ const P=pose(o); r.render(sc,C); const pw=V(-0,0,0); // anchor: origin projected
+  const pj=(v)=>{const w=rig.localToWorld? v.clone().applyMatrix4(rig.matrixWorld):v; const p=w.clone().project(C); return [(p.x*.5+.5)*1100,(1-(p.y*.5+.5))*1100];};
+  return {img:cv.toDataURL('image/png'),anchor:pj(V(0,0,0)),puck:pj(P)}; };
+window.ready=true;
+</script>

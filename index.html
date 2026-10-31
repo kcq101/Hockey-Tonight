@@ -1511,15 +1511,19 @@ function drawSkaterVec(p){
 //   3. movement:   untouched - moveSkater()/physics only ever feed the timers pickFrame reads
 // If the atlas hasn't loaded (or fails), drawSkaterVec() draws the old vector players instead.
 const SPR_H=4.75, SPR_GH=5.1;      // on-screen height in world units: skater standing, goalie in his stance
-const SPR={img:null,meta:null,kits:new Map()};
+const CLASSIC=/[?&]classic\b/.test(location.search);   // ?classic = original 2D sprites and controls
+const SPR={img:null,meta:null,kits:new Map(),img3:null,meta3:null,kits3:new Map()};
 (function(){ fetch('img/sk/atlas.json').then(r=>r.json()).then(m=>{ const im=new Image(); im.decoding='async';
-  im.onload=()=>{ SPR.meta=m; SPR.img=im; if(G&&!G.demo){ getKit(G.home); getKit(G.away); } }; im.src='img/sk/atlas.webp'; }).catch(()=>{}); })();
+  im.onload=()=>{ SPR.meta=m; SPR.img=im; if(G&&!G.demo){ getKit(G.home); getKit(G.away); } }; im.src='img/sk/atlas.webp'; }).catch(()=>{});
+  // 3D-rendered skating set (8-step stride, stick left/centre/right); falls back to the 2D frames above if missing
+  if(!CLASSIC) fetch('img/sk/atlas3d.json').then(r=>r.json()).then(m=>{ const im=new Image(); im.decoding='async';
+    im.onload=()=>{ SPR.meta3=m; SPR.img3=im; if(G&&!G.demo){ getKit(G.home,1); getKit(G.away,1); } }; im.src='img/sk/atlas3d.webp'; }).catch(()=>{}); })();
 const kitCols=t=>{ const d=t.def; return t.home?[d.c1,d.c2,d.dk]:['#f2f5f8',d.c1,d.dk]; };
 // Recolour key colours, keeping the artist's shading: magenta -> jersey, cyan -> stripes, lime -> helmet/gloves/pants
-function getKit(team){
-  if(!SPR.img) return null;
-  const cols=kitCols(team), key=cols.join(); let k=SPR.kits.get(key); if(k) return k;
-  const im=SPR.img, c=document.createElement('canvas'); c.width=im.width; c.height=im.height;
+function getKit(team,three){
+  const im=three?SPR.img3:SPR.img, store=three?SPR.kits3:SPR.kits; if(!im) return null;
+  const cols=kitCols(team), key=cols.join(); let k=store.get(key); if(k) return k;
+  const c=document.createElement('canvas'); c.width=im.width; c.height=im.height;
   const x=c.getContext('2d',{willReadFrequently:true}); x.drawImage(im,0,0);
   let id; try{ id=x.getImageData(0,0,c.width,c.height); }catch(e){ return null; }
   const d=id.data, rgb=cols.map(h=>{ const n=parseInt(h.slice(1),16); return [n>>16,n>>8&255,n&255]; }), REF=[245,240,190];
@@ -1536,8 +1540,8 @@ function getKit(team){
   x.putImageData(id,0,0);
   // hand the result to a plain (GPU-friendly) canvas: the read-optimised one above would be re-uploaded every frame
   const out=document.createElement('canvas'); out.width=c.width; out.height=c.height; out.getContext('2d').drawImage(c,0,0); c.width=c.height=0;
-  if(SPR.kits.size>=4) SPR.kits.clear();      // only two teams play at once; keep memory flat across rematches
-  SPR.kits.set(key,out); return out;
+  if(store.size>=4) store.clear();      // only two teams play at once; keep memory flat across rematches
+  store.set(key,out); return out;
 }
 // facing -> one of 5 drawn directions; the left half of the compass is the right half mirrored
 const SDIR=['E','NE','N','NE','E','SE','S','SE'], SMIR=[0,0,0,1,1,1,0,0], ADIR=['E','E','N','E','E','E','S','E'];
@@ -1560,7 +1564,17 @@ function pickFrame(p){
   if(p.pokeT>0) return ['poke_'+ad,m];
   if(p.lungeT>0||p.homeT>0) return ['check_'+ad,m];
   if(p.spray>0) return ['stop_'+ad,m];
-  const d=SDIR[i];
+  const d=SDIR[i], M3=SPR.meta3&&SPR.meta3.frames;
+  if(M3){
+    // 3D set: 8 stride steps per cycle (stride phase = leg phase, peaks match the skate sound); stick side follows the dangle
+    const sd=!p.dng||Math.abs(p.dng)<.35?'C':((p.dng>0)!==!!m?'R':'L');
+    if(p.amp>.22){
+      if(G.sprint&&p===G.ctrl&&M3['accel_'+ad]) return ['accel_'+ad,m];
+      const f=((Math.floor((p.stride+Math.PI/8)/(Math.PI/4))%8)+8)%8;
+      return ['run_'+d+'_'+f+'_'+sd,m];
+    }
+    return [(G.P.owner===p?'run_'+d+'_4_'+sd:'idle_'+d),m];
+  }
   if(p.amp>.22){
     if(G.sprint&&p===G.ctrl) return ['accel_'+ad,m];
     // push frames centred on the stride peaks (the same peaks the skate sound uses): push, glide, push, glide
@@ -1571,17 +1585,17 @@ function pickFrame(p){
   return [(G.P.owner===p?'run_'+d+'_1':'idle_'+d),m];
 }
 function drawSprite(p){
-  const kit=getKit(p.team); if(!kit) return false;
-  const [nm,mir]=pickFrame(p), f=SPR.meta.frames[nm]; if(!f) return false;
+  const [nm,mir]=pickFrame(p), f3=SPR.meta3&&SPR.meta3.frames[nm], f=f3||SPR.meta.frames[nm]; if(!f) return false;
+  const kit=getKit(p.team,!!f3); if(!kit) return false;
   const {sc,dpr}=view, k=(p.g?SPR_GH*PSG:SPR_H*PS)*sc*dpr/(p.g?SPR.meta.hg:SPR.meta.h0);
   const [sx,sy]=W(p.x,p.y), hop=p.celeb&&G.phase==='goal'?Math.abs(Math.sin(G.t*8+p.weave))*.55*sc*dpr:0;
   ctx.save(); ctx.setTransform(1,0,0,1,0,0); ctx.imageSmoothingEnabled=true; ctx.imageSmoothingQuality='low';   // 'high' is a slow resampler on Android Chrome, paid per skater per frame
   ctx.translate(sx*dpr,sy*dpr+.25*PS*sc*dpr-hop);
   // stride lean: the body rocks smoothly side to side with each push, so motion reads as continuous between the 4 drawn leg poses
-  if(!p.g&&p.down<=0&&p.amp>.22&&nm.startsWith('run_')) ctx.rotate(Math.sin(p.stride)*.07*p.amp);
+  if(!f3&&!p.g&&p.down<=0&&p.amp>.22&&nm.startsWith('run_')) ctx.rotate(Math.sin(p.stride)*.07*p.amp);
   if(p.down>0) ctx.rotate((p.face>-Math.PI/2&&p.face<Math.PI/2?1:-1)*1.25);   // knocked down: lying on the ice
   if(mir) ctx.scale(-1,1);
-  ctx.drawImage(kit,f[0],f[1],f[2],f[3],-f[4]*k,-f[3]*k,f[2]*k,f[3]*k);
+  ctx.drawImage(kit,f[0],f[1],f[2],f[3],-f[4]*k,-(f3?f[7]:f[3])*k,f[2]*k,f[3]*k);   // 3D frames carry their own foot anchor row (f[7]); 2D frames sit on their bottom edge
   ctx.restore(); return true;
 }
 function drawSkater(p){
@@ -1733,6 +1747,12 @@ function drawSheen(){
 // BLADE offsets are in px of a 100 px-tall skater, so they don't depend on the atlas resolution
 const BLADE={S:[-18,-6],SE:[-16,-6],E:[34,-7],NE:[33,-10],N:[51,-23]};
 function bladeWorld(p){
+  const [fn,fm]=pickFrame(p), f3=SPR.meta3&&SPR.meta3.frames[fn];
+  if(f3){ // 3D frames know where their blade is: [5],[6] = puck point, [4],[7] = foot anchor (atlas px)
+    const {sc}=view, k=SPR_H*PS*sc/SPR.meta.h0, [sx,sy]=W(p.x,p.y);
+    const X=sx+(fm?-1:1)*(f3[5]-f3[4])*k, Y=sy+.25*PS*sc+(f3[6]-f3[7])*k;
+    return [G.camX+(X-view.cw/2-G.sx)/sc, G.cam-(Y-view.ch/2-G.sy)/(sc*TILT)];
+  }
   const i=dirIdx(visFace(p)), b=BLADE[SDIR[i]], {sc}=view, k=SPR_H*PS*sc/100, [sx,sy]=W(p.x,p.y);
   const X=sx+(SMIR[i]?-b[0]:b[0])*k, Y=sy+.25*PS*sc+b[1]*k;
   return [G.camX+(X-view.cw/2-G.sx)/sc, G.cam-(Y-view.ch/2-G.sy)/(sc*TILT)];
