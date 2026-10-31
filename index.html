@@ -66,6 +66,8 @@ button:focus-visible{outline:2px solid var(--led);outline-offset:2px}
 #goal .card{text-align:center;transform:scale(.6);opacity:0}
 #goal.on .card{animation:pop 5s ease-out forwards}
 @keyframes pop{0%{transform:scale(.4) rotate(-6deg);opacity:0}7%{transform:scale(1.1) rotate(-3deg);opacity:1}12%{transform:scale(1) rotate(-3deg)}26%{transform:translateY(0) scale(1) rotate(-3deg)}36%{transform:translateY(-27vh) scale(.6) rotate(-3deg)}90%{opacity:1;transform:translateY(-27vh) scale(.6) rotate(-3deg)}100%{opacity:0;transform:translateY(-27vh) scale(.6) rotate(-3deg)}}
+#goal.hat h2{font-size:clamp(46px,15.5vw,96px)}
+#goal.hat.on .card{animation-duration:8.6s}
 #goal h2{margin:0;font:900 clamp(72px,26vw,132px)/.85 var(--f-display);letter-spacing:.02em;color:var(--led);-webkit-text-stroke:3px #2a1600;text-shadow:0 6px 0 #7a2300,0 0 40px rgba(255,140,0,.6)}
 #goal p{margin:10px auto 0;display:inline-block;padding:6px 12px;border-radius:6px;background:rgba(6,9,13,.85);font:700 14px/1.3 var(--f-ui);letter-spacing:.06em}
 #goal p span{color:var(--muted);font-weight:600}
@@ -1037,12 +1039,48 @@ function contests(dt){
   }
 }
 
+const lapper=p=>!!(G.cele&&G.cele.hat&&p===G.cele.scorer);
+const HAT_COL=['#16181c','#c8372d','#2b5fc4','#ececec','#d9a21b','#2f8f4e'];
+// hat trick: fans throw hats over the boards; they arc in and settle on the ice
+function updHats(dt){
+  const c=G.cele; if(G.phaseT<.5) return;
+  const want=Math.min(34,Math.floor((G.phaseT-.5)*11));
+  while(G.hatN<want){
+    G.hatN++;
+    const sx=Math.random()<.5?-1:1, ox=sx*(RW+1), oy=clamp(c.cy+rnd(-26,26),-RH+12,RH-12);
+    const lx=clamp(c.cx+rnd(-RW+6,RW-6)*.85,-RW+4,RW-4), ly=clamp(c.cy+rnd(-22,22),-RH+14,RH-14), T=rnd(.9,1.3), z0=rnd(5,9), g=34;
+    G.hats.push({x:ox,y:oy,z:z0,vx:(lx-ox)/T,vy:(ly-oy)/T,vz:(g*T*T/2-z0)/T,g,rot:rnd(0,6.3),vr:rnd(-9,9),col:HAT_COL[(Math.random()*HAT_COL.length)|0],cap:Math.random()<.5,land:false});
+  }
+  for(const h of G.hats){
+    if(h.land) continue;
+    h.x+=h.vx*dt; h.y+=h.vy*dt; h.vz-=h.g*dt; h.z+=h.vz*dt; h.rot+=h.vr*dt;
+    if(h.z<=0){ h.z=0; h.land=true; h.rot=rnd(0,6.3); }
+  }
+}
+function drawHat(h){
+  const air=h.z>0, sq=air?Math.abs(Math.cos(h.rot))*.6+.4:1, y=h.y+h.z*HZ;
+  if(air) blob(h.x,h.y,.9,.6,'#0a1420',.18/(1+h.z*.3));
+  ctx.fillStyle=h.col; ctx.strokeStyle='rgba(0,0,0,.5)'; ctx.lineWidth=.1;
+  ctx.beginPath(); ctx.ellipse(h.x,y,.95,.95*sq,0,0,7); ctx.fill(); ctx.stroke();      // brim
+  ctx.fillStyle=shade(h.col,1.25); ctx.beginPath(); ctx.ellipse(h.x,y+.28*sq,.62,.62*sq,0,0,7); ctx.fill();   // crown
+  if(h.cap){ ctx.fillStyle=shade(h.col,.8); ctx.beginPath(); ctx.ellipse(h.x+Math.cos(h.rot)*.8,y+Math.sin(h.rot)*.8*sq,.55,.3*sq,h.rot,0,7); ctx.fill(); }
+}
 // after a goal: the scoring team skates in and mobs the scorer by the net; the other team drifts away
 function celeDir(p){
   const c=G.cele;
   if(p.team===c.team){
     let tx=c.x, ty=c.y;
-    if(p!==c.scorer){ const mates=c.team.players.filter(q=>q!==c.scorer), k=mates.indexOf(p), a=G.t*.6+k/mates.length*2*Math.PI+p.weave*.2, r=c.scorer?3.9:2.6; tx=c.x+Math.cos(a)*r; ty=c.y+Math.sin(a)*r*.85; }
+    if(c.hat){
+      // hat trick: the scorer takes a wide victory lap (stick up) while his team stands in the middle of the circle
+      if(p===c.scorer){
+        p.celeb=true;
+        const a=Math.atan2(p.y-c.cy,p.x-c.cx)+.65, R=17;
+        const dx=c.cx+Math.cos(a)*R-p.x, dy=c.cy+Math.sin(a)*R*.9-p.y, d=hyp(dx,dy)||1;
+        return [dx/d*.8,dy/d*.8];
+      }
+      tx=c.cx; ty=c.cy;
+    }
+    if(p!==c.scorer){ const mates=c.team.players.filter(q=>q!==c.scorer), k=mates.indexOf(p), a=G.t*.6+k/mates.length*2*Math.PI+p.weave*.2, r=c.scorer?3.9:2.6; tx=(c.hat?c.cx:c.x)+Math.cos(a)*r; ty=(c.hat?c.cy:c.y)+Math.sin(a)*r*.85; }
     const dx=tx-p.x, dy=ty-p.y, d=hyp(dx,dy);
     if(d<5) p.celeb=true;
     if(d<.6) return [0,0];
@@ -1181,13 +1219,15 @@ function goalScored(side){
   if(scorer){ scorer.goals++; if(P.shot&&P.shot.by===scorer) scorer.sog++;
     for(let i=si+1;i<P.touches.length;i++){ const t=P.touches[i]; if(t.team!==team) break; if(t!==scorer&&!t.g){ assist=t; assist.assists++; break; } } }
   G.phase='goal'; G.phaseT=0; P.shot=null; P.pass=null;
-  G.cele={team,scorer,side,x:clamp(scorer?scorer.x:0,-15,15),y:team.dir*(GL-12)};
+  const hat=!!scorer&&scorer.goals===3;      // third goal of the game by the same skater
+  G.cele={team,scorer,side,hat,x:clamp(scorer?scorer.x:0,-15,15),y:team.dir*(GL-12),cx:0,cy:team.dir*52};
+  G.hats=[]; G.hatN=0;
   for(const q of skaters()) q.celeb=false; if(scorer) scorer.celeb=true;
   if(!G.demo){ const [,ly]=W(0,side*GL); $('#lamp').style.setProperty('--ly',ly<view.ch/2?'0%':'100%'); }
   if(!G.demo){
     const mvName=(scorer&&P.lastMoveBy===scorer&&G.t-P.lastMoveT<2.5)?{oneT:'One-timer',spin:'Spin-o-rama',wrap:'Wraparound'}[P.lastMove]:null;
     $('#goalTxt').innerHTML=(mvName?`<b style="color:var(--led)">${mvName.toUpperCase()}</b> · `:'')+(scorer?`${team.def.abbr} · #${scorer.num} ${scorer.name}${assist?` <span>· ast #${assist.num} ${assist.name}</span>`:' <span>· unassisted</span>'}`:`${team.def.abbr} · own goal`);
-    const gb=$('#goal'); gb.classList.remove('on'); void gb.offsetWidth; gb.classList.add('on');
+    const gb=$('#goal'); gb.classList.toggle('hat',hat); $('#goal h2').textContent=hat?'HAT TRICK!':'GOAL!'; gb.classList.remove('on'); void gb.offsetWidth; gb.classList.add('on');
     const l=$('#lamp'); l.classList.remove('on'); void l.offsetWidth; l.classList.add('on');
     A.goal(team.human); M.duck(5); buzz([60,40,60]);
   }
@@ -1276,7 +1316,7 @@ function receive(s){
 function startFaceoff(spot){
   const P=G.P;
   for(const p of skaters().concat([G.home.goalie,G.away.goalie])){ p.spinT=p.pokeT=p.homeT=p.dekeT=p.wrapT=p.biteT=0; p.behind=false; p.checkTgt=null; }
-  G.spinAcc=0; G.oneTLate=0; G.cele=null;
+  G.spinAcc=0; G.oneTLate=0; G.cele=null; G.hats=[];
   for(const q of skaters()) q.celeb=false;
   for(const team of [G.home,G.away]){
     const dir=team.dir, L=[[0,-2.3],[-12,-5],[12,-5],[-10,-20],[10,-20]];
@@ -1492,7 +1532,8 @@ function step(dt){
     if(G.phase==='play'){ G.clock-=dt; if(G.clock<=0){ G.clock=0; endPeriod(); } }
   } else if(ph==='goal'){
     const P=G.P; P.x+=P.vx*dt; P.y+=P.vy*dt; P.vx*=Math.exp(-6*dt); P.vy*=Math.exp(-6*dt); netWalls(P,PR,false,.2);
-    G.phaseT+=dt; if(G.phaseT>5.2){ $('#goal').classList.remove('on'); $('#lamp').classList.remove('on'); G.cele=null; if(G.period>=4&&!G.demo) endGame(); else startFaceoff({x:0,y:0}); }
+    G.phaseT+=dt; if(G.phaseT>(G.cele&&G.cele.hat?8.6:5.2)){ $('#goal').classList.remove('on'); $('#lamp').classList.remove('on'); G.cele=null; if(G.period>=4&&!G.demo) endGame(); else startFaceoff({x:0,y:0}); }
+    if(G.cele&&G.cele.hat) updHats(dt);
   } else if(ph==='stop'){
     G.phaseT+=dt; if(G.phaseT>1.2) startFaceoff(G.foSpot);
   }
@@ -1502,7 +1543,7 @@ function step(dt){
   G.floats=G.floats.filter(f=>f.l>0);
   for(const f of G.fx) f.t+=dt; G.fx=G.fx.filter(f=>f.t<f.d);
   // camera
-  const P=G.P, F=(G.phase==='goal'&&G.cele)?{x:G.cele.x,y:G.cele.y,vx:0,vy:0}:P, tgt=F.y+clamp(F.vy*.22,-12,12)-view.ctlH*.5/(view.sc*TILT), tgx=F.x+clamp(F.vx*.15,-6,6);
+  const P=G.P, F=(G.phase==='goal'&&G.cele)?(G.cele.hat&&G.cele.scorer?{x:G.cele.scorer.x*.5,y:G.cele.scorer.y,vx:0,vy:0}:{x:G.cele.x,y:G.cele.y,vx:0,vy:0}):P, tgt=F.y+clamp(F.vy*.22,-12,12)-view.ctlH*.5/(view.sc*TILT), tgx=F.x+clamp(F.vx*.15,-6,6);
   const k=Math.min(1,dt*5); G.cam+=(tgt-G.cam)*k; G.camX+=(tgx-G.camX)*k;
   const vs=view.sc*TILT, hiC=104-view.ch/2/vs, loC=-104+(view.ch/2-view.ctlH*.85)/vs; G.cam=clamp(G.cam,Math.min(loC,hiC),Math.max(loC,hiC));
   const limX=Math.max(0,47-view.cw/2/view.sc); G.camX=clamp(G.camX,-limX,limX);
@@ -1535,7 +1576,7 @@ function selStar(p,R){
 }
 function drawSkaterVec(p){
   const C=teamColors(p);
-  const hop=p.celeb&&G.phase==='goal'?Math.abs(Math.sin(G.t*8+p.weave))*.07:0;
+  const hop=p.celeb&&G.phase==='goal'&&!lapper(p)?Math.abs(Math.sin(G.t*8+p.weave))*.07:0;
   ctx.lineCap='round'; ctx.lineJoin='round';
   blob(p.x,p.y-(p.g?2.8:2.6),p.g?2.3:1.7,p.g?3.2:2.9,p.team.home?p.team.def.c1:'#ffffff',p.team.home?.2:.28);
   blob(p.x+.9,p.y-.7,p.g?3.2:2.6,p.g?2.3:1.8,'#14283f',.36);
@@ -1630,7 +1671,7 @@ function drawSprite(p){
   const [nm,mir]=pickFrame(p), f3=SPR.meta3&&SPR.meta3.frames[nm], f=f3||SPR.meta.frames[nm]; if(!f) return false;
   const kit=getKit(p.team,!!f3); if(!kit) return false;
   const {sc,dpr}=view, k=(p.g?SPR_GH*PSG:SPR_H*PS)*sc*dpr/(p.g?SPR.meta.hg:SPR.meta.h0);
-  const [sx,sy]=W(p.x,p.y), hop=p.celeb&&G.phase==='goal'?Math.abs(Math.sin(G.t*8+p.weave))*.55*sc*dpr:0;
+  const [sx,sy]=W(p.x,p.y), hop=p.celeb&&G.phase==='goal'&&!lapper(p)?Math.abs(Math.sin(G.t*8+p.weave))*.55*sc*dpr:0;
   ctx.save(); ctx.setTransform(1,0,0,1,0,0); ctx.imageSmoothingEnabled=true; ctx.imageSmoothingQuality='low';   // 'high' is a slow resampler on Android Chrome, paid per skater per frame
   ctx.translate(sx*dpr,sy*dpr+.25*PS*sc*dpr-hop);
   // stride lean: the body rocks smoothly side to side with each push, so motion reads as continuous between the 4 drawn leg poses
@@ -1859,7 +1900,9 @@ function render(){
   // far-to-near so nearer bodies overlap farther ones; nets and the puck sort in with the players
   const list=skaters().concat([G.home.goalie,G.away.goalie]); list.push({net:1,y:GL},{net:-1,y:-GL},{puck:true,y:P.owner?P.owner.y-.05:P.y});
   list.sort((a,b)=>b.y-a.y);
+  const hats=G.cele&&G.cele.hat&&G.hats||[]; for(const h of hats) if(h.land) drawHat(h);
   for(const p of list){ if(p.net) drawNet(p.net); else if(p.puck) drawPuck(P); else drawSkater(p); }
+  for(const h of hats) if(!h.land) drawHat(h);
   drawFx();
   const fy=ch/2+(G.cam-FRONT_Y)*sc*TILT+G.sy;
   if(fy<ch){ ctx.setTransform(dpr,0,0,dpr,0,0); ctx.drawImage(rinkFrontCv,x0,fy,94*sc,FRONT_H*sc*TILT); wt(); }
