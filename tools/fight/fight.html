@@ -4,6 +4,7 @@
 <script type="module">
 import * as THREE from 'three';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
+import {RoundedBoxGeometry} from 'three/addons/geometries/RoundedBoxGeometry.js';
 const V=(x,y,z)=>new THREE.Vector3(x,y,z), Q=THREE.Quaternion, N=900;
 const cv=document.getElementById('c');
 const r=new THREE.WebGLRenderer({canvas:cv,antialias:true,alpha:true,preserveDrawingBuffer:true});
@@ -34,7 +35,7 @@ const pj=v=>{const p=v.clone().project(C); return [(p.x*.5+.5)*N,(1-(p.y*.5+.5))
 function pose(name,t,o={}){
   mx.stopAllAction(); const clip=g.animations.find(c=>c.name===name); const a=mx.clipAction(clip); a.reset().play(); mx.setTime(Math.min(t,clip.duration-1e-4)); root.rotation.y=({Idle_10:22,Dead:-66,Show_Both_Arm_Muscles:-50,Face_Punch_Reaction:-14}[name]||0)*Math.PI/180;
   root.updateMatrixWorld(true);
-  B.Head.scale.setScalar(1.12); B.LeftHand.scale.setScalar(1.25); B.RightHand.scale.setScalar(1.25); root.updateMatrixWorld(true);
+  B.Head.scale.setScalar(1.12); B.LeftHand.scale.setScalar(0.35); B.RightHand.scale.setScalar(0.35); root.updateMatrixWorld(true);
   if(o.grab){ // fake the jersey grab: lead (left) hand pinned on the other guy's shoulder/collar
     const D=window.DIST||1.0; const k=o.grab;
     const cur=wp(B.LeftHand), T=V(0.12,1.36,D-0.24);
@@ -43,8 +44,25 @@ function pose(name,t,o={}){
   }
 }
 window.yaws=(t0)=>g.animations.map(c=>{ pose(c.name,t0||0); const f=(a,b)=>{const L=wp(B[a]).sub(wp(B[b])); const F=L.clone().cross(V(0,1,0)); return +(Math.atan2(F.x,F.z)*57.3).toFixed(1);}; return [c.name,f('LeftUpLeg','RightUpLeg'),f('LeftArm','RightArm')]; });
+const SKIN=new THREE.MeshStandardMaterial({color:window.SKINC||0xe0a27c,roughness:.75});
+function mkFist(side){ const g=new THREE.Group();
+  const P=window.FP||{w:.095,t:.08,l:.10};
+  const body=new THREE.Mesh(new RoundedBoxGeometry(P.w,P.l,P.t,4,.032),SKIN); g.add(body);
+  // knuckle row along the far end
+  for(let i=0;i<4;i++){ const k=new THREE.Mesh(new THREE.SphereGeometry(.0175,12,10),SKIN); k.position.set((i-1.5)*.022,P.l/2-.012,-P.t/2+.022); g.add(k); }
+  // curled fingers: a rounded bar across the palm side
+  const fg=new THREE.Mesh(new THREE.CapsuleGeometry(.02,P.w-.04,4,10),SKIN); fg.rotation.z=Math.PI/2; fg.position.set(0,P.l/2-.03,P.t/2-.012); g.add(fg);
+  // thumb wrapped across the front of the fingers
+  const th=new THREE.Mesh(new THREE.CapsuleGeometry(.014,.045,4,10),SKIN); th.rotation.z=Math.PI/2+side*.35; th.position.set(side*.012,P.l/2-.05,P.t/2+.006); g.add(th);
+  sc.add(g); return g; }
+const FISTS={L:mkFist(1),R:mkFist(-1)};
+function placeFists(){ root.updateMatrixWorld(true);
+  for(const [k,h,e] of [['L','LeftHand','LeftHandMiddle4'],['R','RightHand','RightHandMiddle4']]){
+    const w=wp(B[h]), q=new Q(); B[h].getWorldQuaternion(q); const g=FISTS[k];
+    const fwd=V(0,1,0).applyQuaternion(q).normalize();
+    g.quaternion.copy(q); g.position.copy(w).add(fwd.multiplyScalar(window.FOFF??.055)); } }
 window.info=()=>g.animations.map(c=>[c.name,c.duration]);
 window.measure=(name,n)=>{ const clip=g.animations.find(c=>c.name===name); const out=[]; for(let i=0;i<=n;i++){ const t=clip.duration*i/n; pose(name,t); out.push([+t.toFixed(2),...['RightHand','LeftHand','Hips','Head'].map(k=>{const p=wp(B[k]);return [+p.x.toFixed(2),+p.y.toFixed(2),+p.z.toFixed(2)];})]); } return out; };
-window.shot=(name,t,o)=>{ pose(name,t,o||{}); r.render(sc,C); return {img:cv.toDataURL('image/png'),anchor:pj(V(0,0,0)),hand:[pj(wp(B.RightHand)),pj(wp(B.LeftHand))],head:pj(wp(B.Head))}; };
+window.shot=(name,t,o)=>{ pose(name,t,o||{}); placeFists(); r.render(sc,C); return {img:cv.toDataURL('image/png'),anchor:pj(V(0,0,0)),hand:[pj(FISTS.R.position),pj(FISTS.L.position)],head:pj(wp(B.Head))}; };
 window.ready=true;
 </script>
