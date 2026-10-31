@@ -474,7 +474,13 @@ function bakeSfx(c){
   // arena reverb impulse response
   job('ir',()=>mk(1.7,2,(d,n)=>d.forEach(a=>{ let lp=0; const pre=Math.floor(.022*sr), er=[.031,.047,.063,.089,.118].map(x=>[Math.floor(x*sr),.5*R()+.3]);
     for(let i=pre;i<n;i++){ const t=(i-pre)/sr, k=Math.min(.95,.25+t*.5); lp=lp*k+(R()*2-1)*(1-k); a[i]=lp*ex(-t/.33)*2; } for(const [p,v] of er) if(p<n) a[p]+=v*(R()<.5?-1:1); }),.9));
-  const ord=['ir','tock','crack','snap','whistle','thud','body','pad','glove','clack','ping','horn','roar','ooh','groan'];
+  // boards smash: plexiglass burst (noise crash + a shower of tinkling shards)
+  job('shatter',()=>mk(1.7,2,(d,n)=>d.forEach(a=>{ const f=svf(),g=svf(),h=svf(); const T=[];
+    for(let k=0;k<90;k++) T.push({t:.004+Math.pow(R(),2.4)*1.35,f:2400+R()*7800,a:.2+R()*.6,d:.01+R()*.06,p:0});
+    for(let i=0;i<n;i++){ const t=i/sr, w=R()*2-1; let v=f(w,5600,.45,1)*ex(-t/.06)*1.3+g(w,2000,.7,1)*ex(-t/.015)*.9+h(w,160,.8,0)*ex(-t/.09)*1.4+w*ex(-t/.003)*.7;
+      for(const q of T){ const u=t-q.t; if(u>=0&&u<q.d*6){ q.p+=TAU*q.f/sr; v+=sin(q.p)*q.a*ex(-u/q.d)*.45; } }
+      a[i]=v; } }),.95));
+  const ord=['ir','tock','crack','snap','whistle','thud','body','pad','glove','clack','ping','horn','roar','ooh','groan','shatter'];
   return {S,later:later.sort((a,b)=>ord.indexOf(a[0])-ord.indexOf(b[0]))};
 }
 // Mix: music is the bed; effects are short accents on top. Both meet in a final limiter so nothing clips.
@@ -523,6 +529,8 @@ const A={ctx:null,on:store.get('blb.snd',true),vol:store.get('blb.svol',2),maste
   board(v,x,y){ const k=clamp(v/60,.12,1); this.play('thud',.3+.5*k,x,y,{gap:.08}); },
   slam(v,x,y){ const k=clamp(v/35,.4,1); this.play('thud',.55+.35*k,x,y,{gap:.08}); if(k>.8) this.ooh(.5); },
   check(s,x,y){ this.play('body',.5+.4*Math.min(1,s),x,y,{gap:.06}); if(s>.8) this.ooh(.6); },
+  smash(x,y){ this.play('body',1,x,y,{gap:0,rate:.85}); this.play('crack',.9,x,y,{gap:0,rate:.7}); this.play('thud',1,x,y,{gap:0,rate:.8});
+    this.play('shatter',1,x,y,{gap:0,wet:1.3}); this.play('roar',.55,null,null,{gap:0,wet:.6,delay:.12}); this.ooh(1.2); },
   post(x,y){ this.play('ping',.6,x,y,{wet:1.2}); this.ooh(.8); },
   save(x,y,spd=50){ const gl=Math.random()<.4; this.play(gl?'glove':'pad',.4+clamp(spd/90,0,1)*.45,x,y); if(spd>78) this.ooh(.4); },
   block(x,y){ this.play('pad',.5,x,y); },
@@ -622,7 +630,7 @@ function newGame(hi,ai,diff,len,demo=false){
   G={home:mkTeam(hi,1,!demo,true),away:mkTeam(ai,-1,false,false),D:DIFF[diff],diff,perLen:len*60,period:1,clock:len*60,t:0,
     phase:'faceoff',phaseT:0,demo,paused:false,
     P:{x:0,y:0,vx:0,vy:0,owner:null,pass:null,shot:null,beat:null,pickBlock:null,pickBlockT:0,noPickT:0,tried:new Set(),touches:[],frozen:false},
-    ctrl:null,cam:0,camX:0,shake:0,parts:[],floats:[],fx:[],charging:false,chargeT:0,spinAcc:0,spinA:null,oneTLate:0,stam:1,stamLock:false,stamIdle:0,sprint:false,oneT:0,foDropped:false,foPress:null,foHints:0,chaser:[null,null],passHint:null,foSpot:{x:0,y:0}};
+    ctrl:null,cam:0,camX:0,shake:0,parts:[],floats:[],fx:[],charging:false,chargeT:0,spinAcc:0,spinA:null,oneTLate:0,stam:1,stamLock:false,stamIdle:0,sprint:false,oneT:0,foDropped:false,foPress:null,foHints:0,chaser:[null,null],passHint:null,foSpot:{x:0,y:0},brk:{n:0,per:0},boards:[],glass:[],brkSpot:null,huge:null,brkForce:false};
   G.home.opp=G.away; G.away.opp=G.home;
   buildRink(); clearTrails(); startFaceoff({x:0,y:0}); updateSB(true);
 }
@@ -850,8 +858,98 @@ function applyHit(c,v){
   fx(v.x,v.y,'burst','#ff6b5a',3+s*1.5); fx(v.x,v.y,'ring','#ff6b5a',3.2+s);
   c.team.hits++; c.hits++; A.check(s,v.x,v.y); G.shake=Math.max(G.shake,.15+.3*s);
   for(let i=0;i<8;i++) G.parts.push({x:v.x,y:v.y,vx:rnd(-12,12),vy:rnd(-12,12),l:rnd(.3,.6)});
+  if(canBreakBoards(v,s,dx,dy)){ breakBoards(v,s); return; }
   if(s>.8) floatTxt(v.x,v.y+3,'BIG HIT!','#ff6b5a');
   if(c.team.human||v.team.human) buzz(s>.8?40:20);
+}
+// ---------------- boards breaking ----------------
+// A rare showpiece: a big, square body check that drives a player into the side boards can smash the panel and glass.
+const BRK={max:3,       // per game
+  odds:1/3,             // chance when every trigger below is met
+  minS:.8,              // hit strength: the 'big hit' tier, checker near full speed
+  near:4,               // victim within this many feet of the boards
+  cone:.82,             // push within ~35 deg of straight into the boards
+  ymax:RH-RR-4,         // straight side boards only: not the curved corners or behind the nets
+  stop:3.6, half:3.5};  // stoppage length (s); half-width of the broken section (ft)
+function canBreakBoards(v,s,dx,dy){
+  if(G.demo||G.phase!=='play'||G.brk.n>=BRK.max||G.brk.per===G.period||s<BRK.minS) return false;
+  const sd=Math.sign(v.x)||1;
+  if(RW-SR-Math.abs(v.x)>BRK.near||Math.abs(v.y)>BRK.ymax||dx*sd<BRK.cone) return false;
+  return G.brkForce||Math.random()<BRK.odds;
+}
+function breakBoards(v,s){
+  const sd=Math.sign(v.x)||1, y=clamp(v.y,-BRK.ymax+BRK.half,BRK.ymax-BRK.half), bx=sd*RW;
+  G.brk.n++; G.brk.per=G.period;
+  G.boards.push({sd,y,t:0,seed:Math.random()*1e4|0});
+  v.x=sd*(RW-SR); v.vx=sd*3; v.vy*=.25; v.down=BRK.stop+.6;
+  // plexiglass: a big spray back across the ice, some up and over into the crowd
+  for(let i=0;i<420;i++){
+    const out=Math.random()<.22, a=rnd(-1.15,1.15), sp=out?rnd(4,14):rnd(8,58)*(Math.random()<.25?1.25:1);
+    const ux=(out?sd:-sd)*Math.cos(a), uy=Math.sin(a);
+    G.glass.push({x:bx-sd*.2,y:y+rnd(-BRK.half,BRK.half),z:rnd(BH,GH),vx:ux*sp,vy:uy*sp,vz:rnd(2,15),r:rnd(0,6.3),vr:rnd(-14,14),sz:rnd(.22,.7)*(Math.random()<.1?2:1),
+      out,wood:false,land:false});
+  }
+  // splintered board chunks: white face, yellow kickplate
+  for(let i=0;i<34;i++){ const a=rnd(-1,1), sp=rnd(6,26);
+    G.glass.push({x:bx-sd*.3,y:y+rnd(-BRK.half,BRK.half),z:rnd(.2,BH),vx:-sd*Math.cos(a)*sp,vy:Math.sin(a)*sp,vz:rnd(3,11),r:rnd(0,6.3),vr:rnd(-9,9),sz:rnd(.35,1.1),
+      out:false,wood:Math.random()<.3?'#e6b02a':'#eef2f5',land:false}); }
+  if(G.glass.length>1400) G.glass.splice(0,G.glass.length-1400);
+  fx(bx-sd*1.5,y,'flash','#ffffff',9,.35); fx(bx-sd*1.5,y,'ring','#cfeaff',8,.6); fx(bx-sd*1,y,'burst','#ffffff',7,.5);
+  G.shake=1.15; A.smash(bx,y); setTimeout(()=>{ if(G&&G.phase==='boards') A.whistle(); },500);
+  buzz([70,50,120]);
+  // play stops; faceoff at the nearest dot on that side
+  const dots=[-69,-20,20,69]; let fy=dots[0]; for(const d of dots) if(Math.abs(d-y)<Math.abs(fy-y)) fy=d;
+  G.foSpot={x:sd*22,y:fy}; G.brkSpot={x:bx,y}; G.huge={t:0,sd,y};
+  G.phase='boards'; G.phaseT=0; G.charging=false;
+}
+function updGlass(dt){
+  for(const b of G.boards) b.t+=dt;
+  if(G.huge){ G.huge.t+=dt; if(G.huge.t>2.6) G.huge=null; }
+  for(const q of G.glass){
+    if(q.land) continue;
+    q.x+=q.vx*dt; q.y+=q.vy*dt; q.r+=q.vr*dt;
+    if(q.z>0){ q.vz-=34*dt; q.z+=q.vz*dt; q.vx*=Math.exp(-.4*dt); q.vy*=Math.exp(-.4*dt);
+      if(q.z<=0){ q.z=0; if(q.vz<-6&&!q.wood){ q.vz*=-.22; q.z=.01; } else q.vz=0; q.vr*=.5; } }
+    else { const k=Math.exp(-(q.wood?4:2.6)*dt); q.vx*=k; q.vy*=k; q.vr*=k; }
+    // inside shards stay on the ice: bounce off the boards
+    if(!q.out){ const w=RW-.25; if(Math.abs(q.x)>w&&Math.sign(q.x)*q.vx>0){ q.x=Math.sign(q.x)*w; q.vx*=-.3; }
+      const h=RH-.25; if(Math.abs(q.y)>h&&Math.sign(q.y)*q.vy>0){ q.y=Math.sign(q.y)*h; q.vy*=-.3; } }
+    if(q.z===0&&hyp(q.vx,q.vy)<.4) q.land=true;
+  }
+}
+// the broken section: a jagged gap in the boards and glass with bent panel pieces hanging into the stands
+function drawBrokenBoards(){
+  for(const b of G.boards){
+    const {sd,y}=b, x0=sd*RW, H=BRK.half, r=mulberry(b.seed), e=clamp(b.t/.18,0,1);
+    ctx.save();
+    // dark gap where the panel was
+    ctx.fillStyle='#05080c'; ctx.beginPath(); ctx.moveTo(x0-sd*.1,y-H); 
+    for(let k=0;k<=8;k++){ const yy=y-H+k*2*H/8; ctx.lineTo(x0+sd*(2.4+r()*.7),yy+(r()-.5)*.8); }
+    ctx.lineTo(x0-sd*.1,y+H); for(let k=8;k>=0;k--){ const yy=y-H+k*2*H/8; ctx.lineTo(x0-sd*(.15+r()*.25),yy); } ctx.closePath(); ctx.fill();
+    // jagged glass stubs along the top edge of the gap
+    ctx.fillStyle='rgba(200,232,250,.75)'; ctx.strokeStyle='rgba(255,255,255,.9)'; ctx.lineWidth=.06;
+    for(const yy of [y-H,y+H]){ const dn=yy<y?1:-1; ctx.beginPath(); ctx.moveTo(x0,yy); ctx.lineTo(x0+sd*.4,yy+dn*(.8+r()*1.2)); ctx.lineTo(x0+sd*.9,yy+dn*(.3+r()*.5)); ctx.lineTo(x0+sd*1.3,yy+dn*(1+r()*1.5)); ctx.lineTo(x0+sd*1.4,yy); ctx.closePath(); ctx.fill(); ctx.stroke(); }
+    // two panel halves knocked out into the crowd, swinging into place
+    for(const [s0,len,rot] of [[-1,H*.9,.5+r()*.3],[1,H*.75,-.4-r()*.3]]){
+      const ax=x0+sd*2.6, ay=y+s0*H*.55; ctx.save(); ctx.translate(ax,ay); ctx.rotate(sd*rot*e+(sd>0?0:Math.PI)*0);
+      ctx.fillStyle='#e6edf2'; ctx.fillRect(sd>0?0:-2.4*e,-len/2,2.4*e,len); ctx.fillStyle='#e6b02a'; ctx.fillRect(sd>0?0:-.45*e,-len/2,.45*e,len);
+      ctx.strokeStyle='#8e9ba7'; ctx.lineWidth=.08; ctx.strokeRect(sd>0?0:-2.4*e,-len/2,2.4*e,len); ctx.restore(); }
+    // glass dust hanging in the air for a moment
+    if(b.t<2.2){ const a=1-b.t/2.2; blob(x0-sd*3,y,7+b.t*4,6+b.t*3,'#e8f4ff',.35*a); }
+    ctx.restore();
+  }
+}
+function drawGlass(flying){
+  for(const q of G.glass){
+    if((q.z>0)!==flying) continue;
+    const px=q.x, py=q.y+q.z*HZ, s=q.sz, c=Math.cos(q.r)*s, sn=Math.sin(q.r)*s;
+    if(flying){ ctx.fillStyle='rgba(0,0,0,.18)'; ctx.fillRect(q.x-s*.3,q.y-s*.2,s*.6,s*.4); }
+    if(q.wood){ ctx.fillStyle=q.wood; ctx.beginPath(); ctx.moveTo(px+c,py+sn); ctx.lineTo(px-sn*.35,py+c*.35); ctx.lineTo(px-c,py-sn); ctx.lineTo(px+sn*.35,py-c*.35); ctx.closePath(); ctx.fill(); continue; }
+    const gl=.5+.5*Math.sin(q.r*3+G.t*(flying?9:1.5)+q.x);
+    ctx.fillStyle=`rgba(${200+gl*55|0},${230+gl*25|0},255,${flying?.92:.82})`;
+    ctx.beginPath(); ctx.moveTo(px+c,py+sn); ctx.lineTo(px-sn*.6,py+c*.6); ctx.lineTo(px-c*.7,py-sn*.7); ctx.closePath(); ctx.fill();
+    if(gl>.82){ ctx.fillStyle='#ffffff'; ctx.fillRect(px-.08,py-.08,.16,.16); }
+  }
 }
 
 // assisted check for the player you control: locks onto the carrier (or nearest opponent) and drives through him
@@ -1362,6 +1460,7 @@ function endPeriod(){
 function nextPeriod(){
   M.set('game');
   $('#inter').hidden=true; G.period++; G.clock=G.period===4?Math.min(G.perLen,180):G.perLen; G.stam=1; G.stamLock=false;
+  G.boards=[]; G.glass=[];   // the crew fixes the boards and sweeps the glass during intermission
   // switch ends each period: home attacks the top in the 1st and 3rd, the bottom in the 2nd and OT
   G.home.dir=G.period%2?1:-1; G.away.dir=-G.home.dir;
   clearTrails(); startFaceoff({x:0,y:0}); updateSB(true);
@@ -1536,16 +1635,20 @@ function step(dt){
     const P=G.P; P.x+=P.vx*dt; P.y+=P.vy*dt; P.vx*=Math.exp(-6*dt); P.vy*=Math.exp(-6*dt); netWalls(P,PR,false,.2);
     G.phaseT+=dt; if(G.phaseT>(G.cele&&G.cele.hat?8.6:5.2)){ $('#goal').classList.remove('on'); $('#lamp').classList.remove('on'); G.cele=null; if(G.period>=4&&!G.demo) endGame(); else startFaceoff({x:0,y:0}); }
     if(G.cele&&G.cele.hat) updHats(dt);
+  } else if(ph==='boards'){
+    const P=G.P; P.x+=P.vx*dt; P.y+=P.vy*dt; P.vx*=Math.exp(-3*dt); P.vy*=Math.exp(-3*dt); rinkConstrain(P,PR); netWalls(P,PR,false,.2);
+    G.phaseT+=dt; if(G.phaseT>BRK.stop) startFaceoff(G.foSpot);
   } else if(ph==='stop'){
     G.phaseT+=dt; if(G.phaseT>1.2) startFaceoff(G.foSpot);
   }
+  if(G.glass.length||G.boards.length||G.huge) updGlass(dt);
   for(const q of G.parts){ q.x+=q.vx*dt; q.y+=q.vy*dt; q.vx*=.92; q.vy*=.92; q.l-=dt; }
   G.parts=G.parts.filter(q=>q.l>0);
   for(const f of G.floats){ f.l-=dt; f.y+=dt*4; }
   G.floats=G.floats.filter(f=>f.l>0);
   for(const f of G.fx) f.t+=dt; G.fx=G.fx.filter(f=>f.t<f.d);
   // camera
-  const P=G.P, F=(G.phase==='goal'&&G.cele)?(G.cele.hat&&G.cele.scorer?{x:G.cele.scorer.x*.5,y:G.cele.scorer.y,vx:0,vy:0}:{x:G.cele.x,y:G.cele.y,vx:0,vy:0}):P, tgt=F.y+clamp(F.vy*.22,-12,12)-view.ctlH*.5/(view.sc*TILT), tgx=F.x+clamp(F.vx*.15,-6,6);
+  const P=G.P, F=(G.phase==='boards'&&G.brkSpot)?{x:G.brkSpot.x*.7,y:G.brkSpot.y,vx:0,vy:0}:(G.phase==='goal'&&G.cele)?(G.cele.hat&&G.cele.scorer?{x:G.cele.scorer.x*.5,y:G.cele.scorer.y,vx:0,vy:0}:{x:G.cele.x,y:G.cele.y,vx:0,vy:0}):P, tgt=F.y+clamp(F.vy*.22,-12,12)-view.ctlH*.5/(view.sc*TILT), tgx=F.x+clamp(F.vx*.15,-6,6);
   const k=Math.min(1,dt*5); G.cam+=(tgt-G.cam)*k; G.camX+=(tgx-G.camX)*k;
   const vs=view.sc*TILT, hiC=104-view.ch/2/vs, loC=-104+(view.ch/2-view.ctlH*.85)/vs; G.cam=clamp(G.cam,Math.min(loC,hiC),Math.max(loC,hiC));
   const limX=Math.max(0,47-view.cw/2/view.sc); G.camX=clamp(G.camX,-limX,limX);
@@ -1902,12 +2005,15 @@ function render(){
   // far-to-near so nearer bodies overlap farther ones; nets and the puck sort in with the players
   const list=skaters().concat([G.home.goalie,G.away.goalie]); list.push({net:1,y:GL},{net:-1,y:-GL},{puck:true,y:P.owner?P.owner.y-.05:P.y});
   list.sort((a,b)=>b.y-a.y);
+  if(G.boards.length) drawBrokenBoards();
+  if(G.glass.length) drawGlass(false);
   const hats=G.cele&&G.cele.hat&&G.hats||[]; for(const h of hats) if(h.land) drawHat(h);
   for(const p of list){ if(p.net) drawNet(p.net); else if(p.puck) drawPuck(P); else drawSkater(p); }
   for(const h of hats) if(!h.land) drawHat(h);
   drawFx();
   const fy=ch/2+(G.cam-FRONT_Y)*sc*TILT+G.sy;
   if(fy<ch){ ctx.setTransform(dpr,0,0,dpr,0,0); ctx.drawImage(rinkFrontCv,x0,fy,94*sc,FRONT_H*sc*TILT); wt(); }
+  if(G.glass.length) drawGlass(true);
   for(const q of G.parts){ ctx.fillStyle=`rgba(245,250,255,${clamp(q.l*1.5,0,.85)})`; ctx.beginPath(); ctx.arc(q.x,q.y,.14+q.l*.12,0,7); ctx.fill(); }
   // screen-space overlays
   ctx.setTransform(dpr,0,0,dpr,0,0);
@@ -1924,6 +2030,7 @@ function render(){
     ctx.font='900 22px "Big Shoulders Display", Impact, sans-serif';
     for(const f of G.floats){ const [fx,fy]=W(f.x,f.y); ctx.globalAlpha=clamp(f.l*1.5,0,1); ctx.lineWidth=4; ctx.strokeStyle='rgba(6,9,13,.85)'; ctx.strokeText(f.txt,fx,fy); ctx.fillStyle=f.col; ctx.fillText(f.txt,fx,fy); }
     ctx.globalAlpha=1;
+    if(G.huge) drawHugeHit();
     if(G.phase==='faceoff' && G.foHints<2){ const [fx,fy]=W(G.foSpot.x,G.foSpot.y-9); ctx.font='800 15px "Big Shoulders Display", Impact, sans-serif'; const t='PRESS PASS AS THE PUCK DROPS'; const w=ctx.measureText(t).width+16; ctx.fillStyle='rgba(6,9,13,.82)'; ctx.fillRect(fx-w/2,fy-12,w,24); ctx.fillStyle='#ffb020'; ctx.fillText(t,fx,fy+1); }
   }
   // off-screen arrows: your skater (amber) and your pass target (blue)
@@ -1955,6 +2062,19 @@ function render(){
   const [pa,pb]=R(P.x,P.y); ctx.fillStyle='#ffb020'; ctx.fillRect(pa-1.5,pb-1.5,3,3);
 }
 
+// HUGE HIT!!! banner: pops in beside the smash, on the ice side and above it, so the shattering stays in view
+function drawHugeHit(){
+  const h=G.huge, {cw,ch}=view, t=h.t, [ix,iy]=W(h.sd*RW,h.y);
+  const pop=t<.18?1.7-.7*(t/.18):1+.04*Math.sin(t*20)*Math.max(0,1-t), al=t>2.1?1-(t-2.1)/.5:1;
+  const top=86, bot=ch-view.ctlH-50; let ty=iy-ch*.2; if(ty<top) ty=Math.min(bot,iy+ch*.2);
+  const tx=cw/2-h.sd*cw*.08;
+  ctx.save(); ctx.globalAlpha=clamp(al,0,1); ctx.translate(tx+(t<.5?rnd(-3,3):0),ty+(t<.5?rnd(-3,3):0)); ctx.scale(pop,pop); ctx.rotate(-h.sd*.06);
+  ctx.font='900 46px "Big Shoulders Display", Impact, sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
+  const g=ctx.createLinearGradient(0,-22,0,22); g.addColorStop(0,'#fff3a0'); g.addColorStop(.5,'#ffb020'); g.addColorStop(1,'#ff3b2f');
+  ctx.lineJoin='round'; ctx.lineWidth=9; ctx.strokeStyle='rgba(6,9,13,.9)'; ctx.strokeText('HUGE HIT!!!',0,0);
+  ctx.lineWidth=3; ctx.strokeStyle='#ffffff'; ctx.strokeText('HUGE HIT!!!',0,0); ctx.fillStyle=g; ctx.fillText('HUGE HIT!!!',0,0);
+  ctx.restore();
+}
 // ---------------- HUD ----------------
 let sbCache='';
 function updateSB(force){
