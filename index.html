@@ -749,7 +749,18 @@ function netWalls(e,r,front,bounce){
 function pushTouch(p){ const T=G.P.touches; if(T[0]!==p) T.unshift(p); if(T.length>6) T.length=6; }
 function setCtrl(p){ if(G.home.human) G.ctrl=p; }
 function nearestTo(team,x,y,except){ let b=null,bd=1e9; for(const p of team.players){ if(p===except||p.down>0) continue; const d=hyp(p.x-x,p.y-y); if(d<bd){bd=d;b=p;} } return b; }
-function switchPlayer(){ const P=G.P, tx=P.owner?P.owner.x:P.x, ty=P.owner?P.owner.y:P.y; const n=nearestTo(G.home,tx,ty,G.ctrl); if(n) setCtrl(n); }
+// On defence (CPU has the puck) switch to the closest skater who is between the puck carrier and the goal he's attacking
+// (ahead of him in his direction of travel), not one who is already beaten behind him. Falls back to plain nearest.
+function switchPlayer(){
+  const P=G.P, o=P.owner, tx=o?o.x:P.x, ty=o?o.y:P.y;
+  let n=null;
+  if(o&&o.team!==G.home){
+    const dir=o.team.dir; let bd=1e9;
+    for(const p of G.home.players){ if(p===G.ctrl||p.down>0) continue; if((p.y-ty)*dir<-1) continue; const d=hyp(p.x-tx,p.y-ty); if(d<bd){bd=d;n=p;} }
+  }
+  if(!n) n=nearestTo(G.home,tx,ty,G.ctrl);
+  if(n) setCtrl(n);
+}
 function setOwner(p){
   const P=G.P; P.owner=p; P.pass=null; P.shot=null; P.beat=null; P.tried.clear(); pushTouch(p);
   if(p.team.human) setCtrl(p);
