@@ -47,7 +47,7 @@ function pose(o){ // o: {phi,u,yaw,lean,low}
   const tgtL=fL.clone().add(V(dL[0],dL[1],dL[2])), tgtR=fR.clone().add(V(dR[0],dR[1],dR[2]));
   ik2(B.LeftUpLeg,B.LeftLeg,B.LeftFoot,tgtL,V(0.15,0.2,1)); ik2(B.RightUpLeg,B.RightLeg,B.RightFoot,tgtR,V(-0.15,0.2,1));
   setW(B.LeftFoot,aax(Y,dL[3]).multiply(restW.LeftFoot)); setW(B.RightFoot,aax(Y,dR[3]).multiply(restW.RightFoot));
-  const P=V(-o.u,0.0,0.98), T=V(0.10,0.86,0.40+(lean-0.2)*0.4);
+  const P=V(-o.u,0.0,0.86), T=V(0.10,0.86,0.40+(lean-0.2)*0.4);
   const dir=P.clone().sub(T).normalize(), dist=P.distanceTo(T);
   const butt=T.clone().sub(dir.clone().multiplyScalar(0.10)), low2=T.clone().add(dir.clone().multiplyScalar(0.46));
   root.updateMatrixWorld(true);
@@ -58,7 +58,7 @@ function pose(o){ // o: {phi,u,yaw,lean,low}
   const L=butt.distanceTo(P); const sh=new THREE.Mesh(new THREE.CylinderGeometry(0.030,0.030,L,10),m1);
   sh.position.copy(butt.clone().add(P).multiplyScalar(.5)); sh.quaternion.setFromUnitVectors(V(0,1,0),P.clone().sub(butt).normalize()); stick.add(sh);
   const bd=V(P.x-T.x,0,P.z-T.z).normalize(); const ba=Math.atan2(bd.x,bd.z);
-  const bl=new THREE.Mesh(new THREE.BoxGeometry(0.06,0.11,0.30),m2); bl.position.set(P.x+bd.x*0.12,0.055,P.z+bd.z*0.12); bl.rotation.y=ba; stick.add(bl);
+  const bl=new THREE.Mesh(new THREE.BoxGeometry(0.05,0.075,0.21),m2); bl.position.set(P.x+bd.x*0.09,0.038,P.z+bd.z*0.09); bl.rotation.y=ba; stick.add(bl);
   rig.rotation.y=o.yaw; rig.updateMatrixWorld(true);
   return P;
 }

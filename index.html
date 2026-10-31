@@ -1235,10 +1235,13 @@ function updPuck(dt){
       if(P.pickBlock===s && P.pickBlockT>0) continue;
       const sx=s.x+Math.cos(s.face)*1.7, sy=s.y+Math.sin(s.face)*1.7;
       const body=hyp(s.x-P.x,s.y-P.y), d=Math.min(hyp(sx-P.x,sy-P.y),body-.4);
-      const reach=s===G.ctrl?2.5:2.1;
+      // forgiving pickup: your skater (and the target of a pass) will reach out for a loose puck or pass that goes by nearby;
+      // shots on net keep the tighter reach so blocks/saves play as before
+      const intended=P.pass&&P.pass.to===s, soft=!P.shot, you=s===G.ctrl;
+      const reach=soft?(you?PICK_YOU:intended?PICK_PASS:2.1):(you?2.5:2.1);
       if(d<reach){
-        const rel=hyp(P.vx-s.vx,P.vy-s.vy), intended=P.pass&&P.pass.to===s;
-        let ok=rel<38||(intended&&rel<100);
+        const rel=hyp(P.vx-s.vx,P.vy-s.vy);
+        let ok=rel<38||(intended&&rel<100)||(soft&&you&&rel<PICK_SPD);
         if(!ok && !P.tried.has(s)){
           P.tried.add(s);
           ok=Math.random()<(P.shot?.12:.42)*(s===G.ctrl?1.3:1);
@@ -1252,6 +1255,8 @@ function updPuck(dt){
     }
   }
 }
+// pickup forgiveness (world units / speed): how far your controlled skater reaches for a loose puck, and how fast a puck can be moving past you
+const PICK_YOU=4.4, PICK_PASS=3.4, PICK_SPD=70;
 function receive(s){
   const P=G.P, wasPass=P.pass&&P.pass.to===s, picked=P.pass&&P.pass.from.team!==s.team&&!s.g;
   if(wasPass&&!picked) fx(s.x,s.y,'ring','#5fb8ff',2.8);
