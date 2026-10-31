@@ -1362,6 +1362,8 @@ function endPeriod(){
 function nextPeriod(){
   M.set('game');
   $('#inter').hidden=true; G.period++; G.clock=G.period===4?Math.min(G.perLen,180):G.perLen; G.stam=1; G.stamLock=false;
+  // switch ends each period: home attacks the top in the 1st and 3rd, the bottom in the 2nd and OT
+  G.home.dir=G.period%2?1:-1; G.away.dir=-G.home.dir;
   clearTrails(); startFaceoff({x:0,y:0}); updateSB(true);
 }
 function statRows(){
