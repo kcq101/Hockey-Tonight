@@ -1809,12 +1809,22 @@ function drawPuck(P){
     ctx.lineCap='round'; for(let i=1;i<=4;i++){ ctx.strokeStyle=`rgba(30,40,55,${.14/i})`; ctx.lineWidth=(.9-i*.12)*PV; ctx.beginPath(); ctx.moveTo(px,y); ctx.lineTo(px-P.vx*.02*i,y-P.vy*.02*i); ctx.stroke(); }
   }
   blob(px+.25*PV+z*.25,py-.22*PV,(.62+z*.15)*PV,(.5+z*.1)*PV,'#14283f',.45-z*.1);
-  const r=(.42+z*.05)*PV;
-  ctx.fillStyle='rgba(255,255,255,.92)'; ctx.beginPath(); ctx.ellipse(px,y-.04,r+.14*PV,(r+.14*PV)*.95,0,0,7); ctx.fill();   // light rim: reads against skates and shadows
-  ctx.fillStyle='#202327'; ctx.beginPath(); ctx.ellipse(px,y-.12,r,r*.9,0,0,7); ctx.fill();
-  ctx.fillStyle='#0c0d0f'; ctx.beginPath(); ctx.arc(px,y,r,0,7); ctx.fill();
-  ctx.strokeStyle='rgba(255,255,255,.3)'; ctx.lineWidth=.08; ctx.beginPath(); ctx.arc(px,y,r*.72,Math.PI*.55,Math.PI*1.05); ctx.stroke();
+  const r=(.42+z*.05)*PV, th=.44, rr=r+.14*PV;     // th = puck thickness in world-y: a short cylinder seen from the broadcast camera
+  // light rim around the whole silhouette: keeps it readable against skates, shadows and ice lines
+  ctx.fillStyle='rgba(255,255,255,.9)'; ctx.beginPath(); ctx.arc(px,y-th,rr,0,7); ctx.fill(); ctx.beginPath(); ctx.arc(px,y,rr,0,7); ctx.fill(); ctx.fillRect(px-rr,y-th,rr*2,th);
+  // side wall: lit from the upper left, dark on the right
+  const sg=ctx.createLinearGradient(px-r,0,px+r,0); sg.addColorStop(0,'#4a5059'); sg.addColorStop(.4,'#23272c'); sg.addColorStop(1,'#08090b');
+  ctx.fillStyle='#08090b'; ctx.beginPath(); ctx.arc(px,y-th,r,0,7); ctx.fill();
+  ctx.fillStyle=sg; ctx.fillRect(px-r,y-th,r*2,th);
+  ctx.strokeStyle='rgba(0,0,0,.6)'; ctx.lineWidth=.06; ctx.beginPath(); ctx.arc(px,y-th,r,Math.PI,Math.PI*2); ctx.stroke();   // soft contact line where it meets the ice
+  // top face: nearly flat dark rubber with a crisp bevelled edge and a faint sheen
+  const tg=ctx.createLinearGradient(px-r,y+r,px+r,y-r); tg.addColorStop(0,'#3a3f46'); tg.addColorStop(1,'#14161a');
+  ctx.fillStyle=tg; ctx.beginPath(); ctx.arc(px,y,r,0,7); ctx.fill();
+  ctx.strokeStyle='rgba(150,160,175,.75)'; ctx.lineWidth=.09; ctx.beginPath(); ctx.arc(px,y,r*.96,0,7); ctx.stroke();                  // bevel
+  ctx.strokeStyle='rgba(255,255,255,.55)'; ctx.lineWidth=.1; ctx.beginPath(); ctx.arc(px,y,r*.96,Math.PI*.6,Math.PI*1.15); ctx.stroke();  // lit edge, upper left
+  ctx.strokeStyle='rgba(0,0,0,.35)'; ctx.lineWidth=.05; ctx.beginPath(); ctx.arc(px,y,r*.62,0,7); ctx.stroke();                          // inner groove
 }
+
 // ---------------- feedback effects ----------------
 // short world-space rings/bursts for passes, interceptions, shots, hits, saves, pokes and blocks
 function fx(x,y,kind,col,r=3,d=.38){ if(G.demo) return; G.fx.push({x,y,kind,col,r,d,t:0}); if(G.fx.length>24) G.fx.shift(); }
