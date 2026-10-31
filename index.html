@@ -767,7 +767,9 @@ function setOwner(p){
   else if(G.home.human){ const c=G.ctrl; if(!c||c.down>0||hyp(c.x-p.x,c.y-p.y)>13) switchPlayer(); }
 }
 function releasePuck(from,vx,vy,block=.28){ const P=G.P; P.owner=null; P.vx=vx; P.vy=vy; P.tried.clear(); P.pickBlock=from; P.pickBlockT=block; P.beat=null; }
-function floatTxt(x,y,txt,col='#fff'){ if(!G.demo) G.floats.push({x,y,txt,col,l:1.1}); }
+// in-play word popups (SAVE!, BLOCKED, BIG HIT!...) are turned off: they distracted from the action. Call sites are kept; flip SHOW_POPUPS to bring them back.
+const SHOW_POPUPS=false;
+function floatTxt(x,y,txt,col='#fff'){ if(SHOW_POPUPS&&!G.demo) G.floats.push({x,y,txt,col,l:1.1}); }
 
 function pickPassTarget(c,v){
   if(!v) v={x:0,y:c.team.dir};
