@@ -32,7 +32,7 @@ function ik2(A,Bm,C,target,pole){
 }
 function pose(o){ // o: {phi,u,yaw,lean,low}
   root.traverse(n=>{const s=rest.get(n); if(s){n.position.copy(s[0]);n.quaternion.copy(s[1]);n.scale.copy(s[2]);}}); rig.rotation.set(0,0,0); root.updateMatrixWorld(true);
-  B.Head.scale.multiplyScalar(1.16); B.LeftHand.scale.multiplyScalar(1.22); B.RightHand.scale.multiplyScalar(1.22); root.updateMatrixWorld(true);
+  const away=Math.max(0,(o.yaw-Math.PI/2)/(Math.PI/2)); B.Head.scale.multiplyScalar(1.16-0.24*away);   // big head reads well facing the camera, too bulky from behind (E 1.16 -> NE 1.04 -> N 0.92) B.LeftHand.scale.multiplyScalar(1.22); B.RightHand.scale.multiplyScalar(1.22); root.updateMatrixWorld(true);
   const phi=o.phi, psR=Math.max(0,Math.sin(phi)), psL=Math.max(0,-Math.sin(phi));
   const lean=o.lean??0.20, low=(o.low??0.22)+0.04*(psR+psL);
   const hp=wp(B.Hips); const target=hp.clone().add(V(0,-low,0.05)); B.Hips.position.copy(B.Hips.parent.worldToLocal(target.clone())); root.updateMatrixWorld(true);
