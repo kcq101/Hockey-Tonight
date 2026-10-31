@@ -59,6 +59,14 @@ function pose(o){ // o: {phi,u,yaw,lean,low}
   sh.position.copy(butt.clone().add(P).multiplyScalar(.5)); sh.quaternion.setFromUnitVectors(V(0,1,0),P.clone().sub(butt).normalize()); stick.add(sh);
   const bd=V(P.x-T.x,0,P.z-T.z).normalize(); const ba=Math.atan2(bd.x,bd.z);
   const bl=new THREE.Mesh(new THREE.BoxGeometry(0.05,0.075,0.21),m2); bl.position.set(P.x+bd.x*0.09,0.038,P.z+bd.z*0.09); bl.rotation.y=ba; stick.add(bl);
+  // rear view: the model's helmet is boxy, so cover it with a smooth rounded shell (only where the face isn't visible)
+  if(o.yaw>=Math.PI*0.74 && B.HeadTop_End){
+    const hh=wp(B.Head), top=wp(B.HeadTop_End), up=top.clone().sub(hh), H=up.length(); up.normalize();
+    const HS=window.HELM||{rx:.50,ry:.60,rz:.55,up:.06,back:.0};
+    const shell=new THREE.Mesh(new THREE.SphereGeometry(1,40,28),new THREE.MeshStandardMaterial({color:0x00ff00,roughness:.6}));
+    shell.scale.set(H*HS.rx,H*HS.ry,H*HS.rz); shell.position.copy(hh.clone().add(top).multiplyScalar(.5)).add(up.clone().multiplyScalar(H*HS.up)).add(V(0,0,-H*HS.back));
+    shell.quaternion.setFromUnitVectors(V(0,1,0),up); stick.add(shell); window.__H=H;
+  }
   rig.rotation.y=o.yaw; rig.updateMatrixWorld(true);
   return P;
 }
