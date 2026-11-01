@@ -60,7 +60,7 @@ function placeFists(){ root.updateMatrixWorld(true);
   for(const [k,h,e] of [['L','LeftHand','LeftHandMiddle4'],['R','RightHand','RightHandMiddle4']]){
     const w=wp(B[h]), q=new Q(); B[h].getWorldQuaternion(q); const g=FISTS[k];
     const fwd=V(0,1,0).applyQuaternion(q).normalize();
-    g.quaternion.copy(q); g.position.copy(w).add(fwd.multiplyScalar(window.FOFF??.055)); } }
+    const FS=window.FSCALE??1.6; g.scale.setScalar(FS); g.quaternion.copy(q); g.position.copy(w).add(fwd.multiplyScalar((window.FOFF??.055)*FS)); } }
 window.info=()=>g.animations.map(c=>[c.name,c.duration]);
 window.measure=(name,n)=>{ const clip=g.animations.find(c=>c.name===name); const out=[]; for(let i=0;i<=n;i++){ const t=clip.duration*i/n; pose(name,t); out.push([+t.toFixed(2),...['RightHand','LeftHand','Hips','Head'].map(k=>{const p=wp(B[k]);return [+p.x.toFixed(2),+p.y.toFixed(2),+p.z.toFixed(2)];})]); } return out; };
 window.shot=(name,t,o)=>{ pose(name,t,o||{}); placeFists(); r.render(sc,C); return {img:cv.toDataURL('image/png'),anchor:pj(V(0,0,0)),hand:[pj(FISTS.R.position),pj(FISTS.L.position)],head:pj(wp(B.Head))}; };
