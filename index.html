@@ -687,11 +687,8 @@ function buildRink(){
   for(let i=0;i<90;i++){ const x=-RW+nr()*2*RW, y=-RH+nr()*2*RH, r=5+nr()*16, white=nr()<.5;
     const g=c.createRadialGradient(x,y,0,x,y,r); const col=white?'245,252,255':'95,160,230';
     g.addColorStop(0,`rgba(${col},${.06+nr()*.08})`); g.addColorStop(1,`rgba(${col},0)`); c.fillStyle=g; c.fillRect(x-r,y-r,2*r,2*r); }
-  // fresh-flood gloss: faint Zamboni lanes and long soft reflections of the arena lights
-  for(let x=-RW+3,k=0;x<RW;x+=7.5,k++){ c.fillStyle=k%2?'rgba(255,255,255,.05)':'rgba(80,150,220,.04)'; c.fillRect(x,-RH,7.5,2*RH); }
-  for(let i=0;i<9;i++){ const y=-RH+12+i*(2*RH-24)/8+(nr()-.5)*8, x=(nr()-.5)*40;
-    c.save(); c.translate(x,y); c.rotate(-.5); const sg=c.createLinearGradient(0,-3,0,3); sg.addColorStop(0,'rgba(255,255,255,0)'); sg.addColorStop(.5,'rgba(255,255,255,.16)'); sg.addColorStop(1,'rgba(255,255,255,0)');
-    c.fillStyle=sg; c.fillRect(-26,-3,52,6); c.restore(); }
+  // (Zamboni lanes and diagonal light streaks removed: they read as stripes on the ice)
+  for(let i=0;i<9;i++){ nr(); nr(); }   // keep the scratch/glint pattern below identical
   // painted markings, frozen under the surface
   const RED='#cf3a43', BLUE='#2e5fc0';
   c.fillStyle=RED; c.fillRect(-RW,-.5,2*RW,1);
@@ -1520,8 +1517,9 @@ function moveSkater(p,dx,dy,dt){
   netWalls(p,SR,true,0);
   if(p.spray>0) p.spray-=dt;
   const mv=hyp(p.x-ox,p.y-oy);
-  p.amp+=(((m>.05&&p.down<=0&&sp>1.5)?clamp(.45+sp/max*.6,0,1):0)-p.amp)*Math.min(1,dt*6);
-  p.stride+=mv*.42;
+  const burst=G.sprint&&p===G.ctrl;
+  p.amp+=(((m>.05&&p.down<=0&&sp>1.5)?(burst?1:clamp(.45+sp/max*.6,0,1)):0)-p.amp)*Math.min(1,dt*6);
+  p.stride+=mv*.42*(burst?1.3:1);   // quicker, harder strides on a speed burst
   if(p.shotT>0) p.shotT-=dt; if(p.lungeT>0) p.lungeT-=dt; if(p.passT>0) p.passT-=dt;
   if(mv>.02 && p.down<=0){
     const ss=Math.sin(p.stride), lo=.32+.5*p.amp*Math.max(0,ss), ro=.32+.5*p.amp*Math.max(0,-ss);
@@ -2070,14 +2068,13 @@ function pickFrame(p){
     // 3D set: 8 stride steps per cycle (stride phase = leg phase, peaks match the skate sound); stick side follows the dangle
     const sd=!p.dng||Math.abs(p.dng)<.35?'C':((p.dng>0)!==!!m?'R':'L');
     if(p.amp>.22){
-      if(G.sprint&&p===G.ctrl&&M3['accel_'+ad]) return ['accel_'+ad,m];
+      // sprinting uses the full stride cycle (legs keep pumping) rather than one frozen accel pose
       const f=((Math.floor((p.stride+Math.PI/8)/(Math.PI/4))%8)+8)%8;
       return ['run_'+d+'_'+f+'_'+sd,m];
     }
     return [(G.P.owner===p?'run_'+d+'_4_'+sd:'idle_'+d),m];
   }
   if(p.amp>.22){
-    if(G.sprint&&p===G.ctrl) return ['accel_'+ad,m];
     // push frames centred on the stride peaks (the same peaks the skate sound uses): push, glide, push, glide
     const f=((Math.floor((p.stride-Math.PI/4)/(Math.PI/2))%4)+4)%4;
     return ['run_'+d+'_'+f,m];
