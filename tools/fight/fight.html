@@ -55,11 +55,14 @@ function mkFist(){ const g=new THREE.Group(); g.matrixAutoUpdate=false;
   // four curled fingers stacked down the near face (index on top, pinky shortest), with soft creases between them
   const ys=[.027,.009,-.009,-.026], ln=[.03,.032,.03,.024], CR=new THREE.MeshStandardMaterial({color:0xbf8060,roughness:.9});
   for(let i=0;i<4;i++){ const x1=.104; g.add(capAlong(.0115,[x1-ln[i],ys[i],.028],[x1,ys[i],.028],SKIN)); }
-  for(let i=0;i<3;i++){ const y=(ys[i]+ys[i+1])/2; g.add(capAlong(.0018,[.084,y,.0392],[.111,y,.0392],CR)); g.add(capAlong(.0018,[.111,y,.0392],[.117,y,.022],CR)); }
-  // thumb: a pad at the base, then folded forward over the top of the index and middle fingers
-  const pad=new THREE.Mesh(new THREE.SphereGeometry(1,16,12),SKIN); pad.scale.set(.034,.022,.028); pad.position.set(.035,.032,.022); g.add(pad);
-  g.add(capAlong(.0155,[.038,.04,.03],[.094,.022,.046],SKIN));
-  const nail=new THREE.Mesh(new THREE.SphereGeometry(1,12,8),new THREE.MeshStandardMaterial({color:0xf0c4a8,roughness:.5})); nail.scale.set(.011,.006,.006); nail.position.set(.1,.03,.052); g.add(nail);
+  for(let i=0;i<3;i++){ const y=(ys[i]+ys[i+1])/2; g.add(capAlong(.0018,[.084,y,.0392],[.111,y,.0392],CR)); }
+  // thumb: from a pad at the heel of the hand it comes over the top, bends at the knuckle,
+  // and folds DOWN across the front of the index and middle fingers, tip tucked in (it never points forward)
+  const pad=new THREE.Mesh(new THREE.SphereGeometry(1,18,14),SKIN); pad.scale.set(.03,.024,.026); pad.position.set(.03,.03,.02); g.add(pad);
+  const T0=[.032,.036,.032], T1=[.07,.04,.042], T2=[.073,-.004,.044];
+  g.add(capAlong(.0155,T0,T1,SKIN)); g.add(capAlong(.0145,T1,T2,SKIN));
+  const bend=new THREE.Mesh(new THREE.SphereGeometry(.0158,14,10),SKIN); bend.position.set(...T1); g.add(bend);
+  const nail=new THREE.Mesh(new THREE.SphereGeometry(1,14,10),new THREE.MeshStandardMaterial({color:0xf2c9ae,roughness:.45})); nail.scale.set(.0085,.011,.004); nail.position.set(.073,.004,.0585); g.add(nail);
   sc.add(g); return g; }
 const FISTS={L:mkFist(),R:mkFist()};
 const CAMV=V(-Math.cos(AZ),Math.sin(EL),Math.sin(AZ)).normalize();
@@ -72,7 +75,7 @@ function placeFists(){ root.updateMatrixWorld(true);
     const S=window.FSCALE??1.45; g.matrix.makeBasis(F,U,P).scale(V(S,S,S)).setPosition(w.clone().add(F.clone().multiplyScalar(.012*S))); g.matrixWorldNeedsUpdate=true; } }
 window.close=(name,t,o,side,size,az,hideFist)=>{ pose(name,t,o||{}); if(window.ORIG){ B.LeftHand.scale.setScalar(1); B.RightHand.scale.setScalar(1); root.updateMatrixWorld(true);} placeFists();
   for(const k of ['L','R']) FISTS[k].visible=!hideFist;
-  const h=wp(B[side==='L'?'LeftHand':'RightHand']); const c=new THREE.OrthographicCamera(-size,size,size,-size,.1,50); const a=(az||0)*Math.PI/180;
+  const Mx=FISTS[side].matrix, h=V().setFromMatrixPosition(Mx).add(V().setFromMatrixColumn(Mx,0).multiplyScalar(.06)); const c=new THREE.OrthographicCamera(-size,size,size,-size,.1,50); const a=(az||0)*Math.PI/180;
   c.position.set(h.x-Math.cos(a)*4,h.y+.3,h.z+Math.sin(a)*4); c.lookAt(h); c.updateProjectionMatrix();
   let ax=[]; if(window.AXES){ const q=new Q(); B[side==='L'?'LeftHand':'RightHand'].getWorldQuaternion(q); for(const [v,col] of [[V(.09,0,0),0xff0000],[V(0,.14,0),0x00ff00],[V(0,0,.09),0x0000ff]]){ const m=new THREE.Mesh(new THREE.SphereGeometry(.016),new THREE.MeshBasicMaterial({color:col,depthTest:false})); m.position.copy(h).add(v.applyQuaternion(q)); sc.add(m); ax.push(m);} }
   r.render(sc,c); for(const m of ax) sc.remove(m); for(const k of ['L','R']) FISTS[k].visible=true; return cv.toDataURL('image/png'); };
