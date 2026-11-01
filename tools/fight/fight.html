@@ -35,7 +35,7 @@ const pj=v=>{const p=v.clone().project(C); return [(p.x*.5+.5)*N,(1-(p.y*.5+.5))
 function pose(name,t,o={}){
   mx.stopAllAction(); const clip=g.animations.find(c=>c.name===name); const a=mx.clipAction(clip); a.reset().play(); mx.setTime(Math.min(t,clip.duration-1e-4)); root.rotation.y=({Idle_10:22,Dead:-66,Show_Both_Arm_Muscles:-50,Face_Punch_Reaction:-14}[name]||0)*Math.PI/180;
   root.updateMatrixWorld(true);
-  B.Head.scale.setScalar(1.12); B.LeftHand.scale.setScalar(0.35); B.RightHand.scale.setScalar(0.35); root.updateMatrixWorld(true);
+  B.Head.scale.setScalar(1.12); B.LeftHand.scale.setScalar(0.02); B.RightHand.scale.setScalar(0.02); root.updateMatrixWorld(true);
   if(o.grab){ // fake the jersey grab: lead (left) hand pinned on the other guy's shoulder/collar
     const D=window.DIST||1.0; const k=o.grab;
     const cur=wp(B.LeftHand), T=V(0.12,1.36,D-0.24);
@@ -44,25 +44,40 @@ function pose(name,t,o={}){
   }
 }
 window.yaws=(t0)=>g.animations.map(c=>{ pose(c.name,t0||0); const f=(a,b)=>{const L=wp(B[a]).sub(wp(B[b])); const F=L.clone().cross(V(0,1,0)); return +(Math.atan2(F.x,F.z)*57.3).toFixed(1);}; return [c.name,f('LeftUpLeg','RightUpLeg'),f('LeftArm','RightArm')]; });
-const SKIN=new THREE.MeshStandardMaterial({color:window.SKINC||0xe0a27c,roughness:.75});
-function mkFist(side){ const g=new THREE.Group();
-  const P=window.FP||{w:.095,t:.08,l:.10};
-  const body=new THREE.Mesh(new RoundedBoxGeometry(P.w,P.l,P.t,4,.032),SKIN); g.add(body);
-  // knuckle row along the far end
-  for(let i=0;i<4;i++){ const k=new THREE.Mesh(new THREE.SphereGeometry(.0175,12,10),SKIN); k.position.set((i-1.5)*.022,P.l/2-.012,-P.t/2+.022); g.add(k); }
-  // curled fingers: a rounded bar across the palm side
-  const fg=new THREE.Mesh(new THREE.CapsuleGeometry(.02,P.w-.04,4,10),SKIN); fg.rotation.z=Math.PI/2; fg.position.set(0,P.l/2-.03,P.t/2-.012); g.add(fg);
-  // thumb wrapped across the front of the fingers
-  const th=new THREE.Mesh(new THREE.CapsuleGeometry(.014,.045,4,10),SKIN); th.rotation.z=Math.PI/2+side*.35; th.position.set(side*.012,P.l/2-.05,P.t/2+.006); g.add(th);
+const SKIN=new THREE.MeshStandardMaterial({color:window.SKINC||0xe0a27c,roughness:.72});
+const SKIN2=new THREE.MeshStandardMaterial({color:0xd08f68,roughness:.78});
+// A closed fist in its own frame: X = forward (knuckles), Y = up (thumb side), Z = toward the camera (curled fingers).
+function capAlong(r,a,b2,mat){ const A=V(...a), Bv=V(...b2), d=Bv.clone().sub(A), L=d.length(); const m=new THREE.Mesh(new THREE.CapsuleGeometry(r,L,6,14),mat);
+  m.position.copy(A.clone().add(Bv).multiplyScalar(.5)); m.quaternion.setFromUnitVectors(V(0,1,0),d.normalize()); return m; }
+function mkFist(){ const g=new THREE.Group(); g.matrixAutoUpdate=false;
+  g.add(capAlong(.027,[-.01,0,0],[.03,0,0],SKIN));                                       // wrist into the cuff
+  const body=new THREE.Mesh(new RoundedBoxGeometry(.10,.088,.078,6,.032),SKIN); body.position.set(.066,0,0); g.add(body);
+  // four curled fingers stacked down the near face (index on top, pinky shortest), with soft creases between them
+  const ys=[.027,.009,-.009,-.026], ln=[.03,.032,.03,.024], CR=new THREE.MeshStandardMaterial({color:0xbf8060,roughness:.9});
+  for(let i=0;i<4;i++){ const x1=.104; g.add(capAlong(.0115,[x1-ln[i],ys[i],.028],[x1,ys[i],.028],SKIN)); }
+  for(let i=0;i<3;i++){ const y=(ys[i]+ys[i+1])/2; g.add(capAlong(.0018,[.084,y,.0392],[.111,y,.0392],CR)); g.add(capAlong(.0018,[.111,y,.0392],[.117,y,.022],CR)); }
+  // thumb: a pad at the base, then folded forward over the top of the index and middle fingers
+  const pad=new THREE.Mesh(new THREE.SphereGeometry(1,16,12),SKIN); pad.scale.set(.034,.022,.028); pad.position.set(.035,.032,.022); g.add(pad);
+  g.add(capAlong(.0155,[.038,.04,.03],[.094,.022,.046],SKIN));
+  const nail=new THREE.Mesh(new THREE.SphereGeometry(1,12,8),new THREE.MeshStandardMaterial({color:0xf0c4a8,roughness:.5})); nail.scale.set(.011,.006,.006); nail.position.set(.1,.03,.052); g.add(nail);
   sc.add(g); return g; }
-const FISTS={L:mkFist(1),R:mkFist(-1)};
+const FISTS={L:mkFist(),R:mkFist()};
+const CAMV=V(-Math.cos(AZ),Math.sin(EL),Math.sin(AZ)).normalize();
 function placeFists(){ root.updateMatrixWorld(true);
   for(const [k,h,e] of [['L','LeftHand','LeftHandMiddle4'],['R','RightHand','RightHandMiddle4']]){
     const w=wp(B[h]), q=new Q(); B[h].getWorldQuaternion(q); const g=FISTS[k];
-    const fwd=V(0,1,0).applyQuaternion(q).normalize();
-    const FS=window.FSCALE??1.6; g.scale.setScalar(FS); g.quaternion.copy(q); g.position.copy(w).add(fwd.multiplyScalar((window.FOFF??.055)*FS)); } }
+    const F=V(0,1,0).applyQuaternion(q).normalize();
+    let U=V(0,1,0).sub(F.clone().multiplyScalar(F.y)); if(U.length()<.35) U=V(0,0,1).sub(F.clone().multiplyScalar(F.z)).add(V(0,.5,0)); U.sub(F.clone().multiplyScalar(U.dot(F))).normalize();
+    let P=F.clone().cross(U); if(P.dot(CAMV)<0) P.negate();
+    const S=window.FSCALE??1.45; g.matrix.makeBasis(F,U,P).scale(V(S,S,S)).setPosition(w.clone().add(F.clone().multiplyScalar(.012*S))); g.matrixWorldNeedsUpdate=true; } }
+window.close=(name,t,o,side,size,az,hideFist)=>{ pose(name,t,o||{}); if(window.ORIG){ B.LeftHand.scale.setScalar(1); B.RightHand.scale.setScalar(1); root.updateMatrixWorld(true);} placeFists();
+  for(const k of ['L','R']) FISTS[k].visible=!hideFist;
+  const h=wp(B[side==='L'?'LeftHand':'RightHand']); const c=new THREE.OrthographicCamera(-size,size,size,-size,.1,50); const a=(az||0)*Math.PI/180;
+  c.position.set(h.x-Math.cos(a)*4,h.y+.3,h.z+Math.sin(a)*4); c.lookAt(h); c.updateProjectionMatrix();
+  let ax=[]; if(window.AXES){ const q=new Q(); B[side==='L'?'LeftHand':'RightHand'].getWorldQuaternion(q); for(const [v,col] of [[V(.09,0,0),0xff0000],[V(0,.14,0),0x00ff00],[V(0,0,.09),0x0000ff]]){ const m=new THREE.Mesh(new THREE.SphereGeometry(.016),new THREE.MeshBasicMaterial({color:col,depthTest:false})); m.position.copy(h).add(v.applyQuaternion(q)); sc.add(m); ax.push(m);} }
+  r.render(sc,c); for(const m of ax) sc.remove(m); for(const k of ['L','R']) FISTS[k].visible=true; return cv.toDataURL('image/png'); };
 window.info=()=>g.animations.map(c=>[c.name,c.duration]);
 window.measure=(name,n)=>{ const clip=g.animations.find(c=>c.name===name); const out=[]; for(let i=0;i<=n;i++){ const t=clip.duration*i/n; pose(name,t); out.push([+t.toFixed(2),...['RightHand','LeftHand','Hips','Head'].map(k=>{const p=wp(B[k]);return [+p.x.toFixed(2),+p.y.toFixed(2),+p.z.toFixed(2)];})]); } return out; };
-window.shot=(name,t,o)=>{ pose(name,t,o||{}); placeFists(); r.render(sc,C); return {img:cv.toDataURL('image/png'),anchor:pj(V(0,0,0)),hand:[pj(FISTS.R.position),pj(FISTS.L.position)],head:pj(wp(B.Head))}; };
+window.shot=(name,t,o)=>{ pose(name,t,o||{}); placeFists(); r.render(sc,C); return {img:cv.toDataURL('image/png'),anchor:pj(V(0,0,0)),hand:[pj(V().setFromMatrixPosition(FISTS.R.matrix)),pj(V().setFromMatrixPosition(FISTS.L.matrix))],head:pj(wp(B.Head))}; };
 window.ready=true;
 </script>
