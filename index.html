@@ -679,14 +679,19 @@ function buildRink(){
   // ice base
   rrPath(c,RW,RH,RR);
   const ig=c.createLinearGradient(-RW,0,RW,0);
-  ig.addColorStop(0,'#b4d2ea'); ig.addColorStop(.14,'#cce2f4'); ig.addColorStop(.5,'#dbeaf8'); ig.addColorStop(.86,'#cce2f4'); ig.addColorStop(1,'#b4d2ea');
+  ig.addColorStop(0,'#94c0e6'); ig.addColorStop(.14,'#b3d6f3'); ig.addColorStop(.5,'#c9e3f9'); ig.addColorStop(.86,'#b3d6f3'); ig.addColorStop(1,'#94c0e6');
   c.fillStyle=ig; c.fill(); c.save(); c.clip();
-  const vg=c.createLinearGradient(0,-RH,0,RH); vg.addColorStop(0,'rgba(90,150,210,.16)'); vg.addColorStop(.5,'rgba(255,255,255,0)'); vg.addColorStop(1,'rgba(90,150,210,.16)');
+  const vg=c.createLinearGradient(0,-RH,0,RH); vg.addColorStop(0,'rgba(70,140,215,.2)'); vg.addColorStop(.5,'rgba(255,255,255,0)'); vg.addColorStop(1,'rgba(70,140,215,.2)');
   c.fillStyle=vg; c.fillRect(-RW,-RH,2*RW,2*RH);
   const nr=mulberry(3);
-  for(let i=0;i<70;i++){ const x=-RW+nr()*2*RW, y=-RH+nr()*2*RH, r=5+nr()*16, white=nr()<.55;
-    const g=c.createRadialGradient(x,y,0,x,y,r); const col=white?'255,255,255':'120,175,225';
+  for(let i=0;i<90;i++){ const x=-RW+nr()*2*RW, y=-RH+nr()*2*RH, r=5+nr()*16, white=nr()<.5;
+    const g=c.createRadialGradient(x,y,0,x,y,r); const col=white?'245,252,255':'95,160,230';
     g.addColorStop(0,`rgba(${col},${.06+nr()*.08})`); g.addColorStop(1,`rgba(${col},0)`); c.fillStyle=g; c.fillRect(x-r,y-r,2*r,2*r); }
+  // fresh-flood gloss: faint Zamboni lanes and long soft reflections of the arena lights
+  for(let x=-RW+3,k=0;x<RW;x+=7.5,k++){ c.fillStyle=k%2?'rgba(255,255,255,.05)':'rgba(80,150,220,.04)'; c.fillRect(x,-RH,7.5,2*RH); }
+  for(let i=0;i<9;i++){ const y=-RH+12+i*(2*RH-24)/8+(nr()-.5)*8, x=(nr()-.5)*40;
+    c.save(); c.translate(x,y); c.rotate(-.5); const sg=c.createLinearGradient(0,-3,0,3); sg.addColorStop(0,'rgba(255,255,255,0)'); sg.addColorStop(.5,'rgba(255,255,255,.16)'); sg.addColorStop(1,'rgba(255,255,255,0)');
+    c.fillStyle=sg; c.fillRect(-26,-3,52,6); c.restore(); }
   // painted markings, frozen under the surface
   const RED='#cf3a43', BLUE='#2e5fc0';
   c.fillStyle=RED; c.fillRect(-RW,-.5,2*RW,1);
@@ -1000,7 +1005,7 @@ function fLand(f,o){
     if(up){ o.grab=false; fHurt(o,.35); o.kb+=.16; }
     F.fx=F.fx||[]; F.fx.push({who:o,t:0,big:false,blocked:true});
   } else {
-    fHurt(o,up?.75:.42); o.kb+=up?.24:.1; if(up) o.grab=false; f.lands++;
+    fHurt(o,up?.75:.42); o.kb+=up?.16:.06; if(up) o.grab=false; f.lands++;
     A.play('body',up?.95:.7,null,null,{gap:0,rate:up?1.05:1.3+rnd(0,.15)}); if(up){ A.play('crack',.35,null,null,{gap:0,rate:.55}); A.ooh(.9); }
     G.shake=Math.max(G.shake,up?.5:.22); o.hitT=0;
     (F.fx=F.fx||[]).push({who:o,t:0,big:up,blocked:false});
@@ -1131,7 +1136,12 @@ function buildFightBg(){
     x.fillStyle='rgba(120,135,150,.35)'; x.fillRect(ax+w,yB+2,1,yK-yB-4); ax+=w; }
   x.fillStyle='#e6b02a'; x.fillRect(0,yK,cw,yI-yK);
   // ice: brighter toward us, a shadow under the boards, a few skate scratches
-  g=x.createLinearGradient(0,yI,0,ch); g.addColorStop(0,'#a9c6dd'); g.addColorStop(.12,'#cfe2f2'); g.addColorStop(1,'#eef5fb'); x.fillStyle=g; x.fillRect(0,yI,cw,ch-yI);
+  g=x.createLinearGradient(0,yI,0,ch); g.addColorStop(0,'#8cb8de'); g.addColorStop(.12,'#b6d6f2'); g.addColorStop(.6,'#cfe5f9'); g.addColorStop(1,'#e2effb'); x.fillStyle=g; x.fillRect(0,yI,cw,ch-yI);
+  // the boards and kickplate mirrored in the glossy surface
+  g=x.createLinearGradient(0,yI,0,yI+(yI-yB)*.9); g.addColorStop(0,'rgba(255,255,255,.4)'); g.addColorStop(.12,'rgba(230,176,42,.18)'); g.addColorStop(.25,'rgba(255,255,255,.22)'); g.addColorStop(1,'rgba(255,255,255,0)');
+  x.fillStyle=g; x.fillRect(0,yI,cw,(yI-yB)*.9);
+  for(let k=0;k<5;k++){ const gx=R()*cw, gy=yI+20+R()*(vh-yI); const sg=x.createRadialGradient(gx,gy,0,gx,gy,60+R()*60); sg.addColorStop(0,'rgba(255,255,255,.35)'); sg.addColorStop(1,'rgba(255,255,255,0)');
+    x.save(); x.translate(gx,gy); x.scale(2.2,.35); x.translate(-gx,-gy); x.fillStyle=sg; x.fillRect(gx-130,gy-130,260,260); x.restore(); }
   x.strokeStyle='rgba(255,255,255,.55)'; x.lineWidth=1;
   for(let k=0;k<26;k++){ const y=yI+12+R()*(ch-yI-12), x0=R()*cw, l=30+R()*120; x.beginPath(); x.moveTo(x0,y); x.quadraticCurveTo(x0+l/2,y+(R()-.5)*8,x0+l,y+(R()-.5)*6); x.stroke(); }
   x.fillStyle='rgba(46,95,192,.18)'; x.fillRect(cw*.12,yI,cw*.035,ch-yI);   // a blue line running away from us, out past the fighters
@@ -1173,10 +1183,14 @@ function drawFight(){
   ctx.drawImage(F.bg,0,0,cw,ch);
   const ppm=Math.min(vh*.6,cw*.8)/1.9, Y=vh*.86, M=SPR.metaF, k=ppm/(M.ppm*M.ppmSrc);
   for(const gr of F.gear) if(gr.z<.7) drawGear(gr,cw/2,Y,ppm);
-  const L=F.L, R=F.R, xl=cw/2+(-F.sp/2-L.kb+L.off)*ppm, xr=cw/2+(F.sp/2+R.kb-R.off)*ppm;
+  const L=F.L, R=F.R; let xl=cw/2+(-F.sp/2-L.kb+L.off)*ppm, xr=cw/2+(F.sp/2+R.kb-R.off)*ppm;
+  // keep both fighters in frame: the camera drifts with the scrap (eased) rather than letting a knocked-back guy slide off the edge
+  { const m=.62*ppm+10, lo=m-xl, hi=(cw-m)-xr; const want=lo>0?Math.min(lo,Math.max(hi,0)):hi<0?Math.max(hi,Math.min(lo,0)):0; F.camS=(F.camS||0)+(want-(F.camS||0))*.15; xl+=F.camS; xr+=F.camS; }
   for(const [x,f] of [[xl,L],[xr,R]]){ const w=f.st==='ko'&&f.t>1.1?1.3:.55; ctx.fillStyle='rgba(30,55,80,.28)'; ctx.beginPath(); ctx.ellipse(x+(f.st==='ko'?f.side*.1*ppm:0),Y,w*ppm*.5,ppm*.07,0,0,7); ctx.fill(); }
   const atk=f=>f.st==='jab'||f.st==='ljab'||f.st==='upper';
   const order=atk(L)&&!atk(R)?[R,L]:[L,R]; const head={};
+  // reflections in the ice
+  ctx.save(); ctx.globalAlpha=.14; ctx.translate(0,2*Y); ctx.scale(1,-1); for(const f of order) drawFighter(f,f===L?xl:xr,Y,k,f===R); ctx.restore();
   for(const f of order) head[f===L?'L':'R']=drawFighter(f,f===L?xl:xr,Y,k,f===R);
   for(const gr of F.gear) if(gr.z>=.7) drawGear(gr,cw/2,Y,ppm);
   // punch impacts: a white starburst on the face; a blue flash on a blocked one
@@ -2208,7 +2222,7 @@ let sheenCv=null;
 function sheenSprite(){
   if(sheenCv) return sheenCv;
   sheenCv=document.createElement('canvas'); sheenCv.width=sheenCv.height=128; const x=sheenCv.getContext('2d');
-  const g=x.createRadialGradient(64,64,0,64,64,64); g.addColorStop(0,'rgba(255,255,255,.55)'); g.addColorStop(.18,'rgba(250,253,255,.28)'); g.addColorStop(.55,'rgba(225,240,255,.08)'); g.addColorStop(1,'rgba(225,240,255,0)');
+  const g=x.createRadialGradient(64,64,0,64,64,64); g.addColorStop(0,'rgba(255,255,255,.75)'); g.addColorStop(.16,'rgba(248,252,255,.4)'); g.addColorStop(.5,'rgba(215,235,255,.12)'); g.addColorStop(1,'rgba(215,235,255,0)');
   x.fillStyle=g; x.fillRect(0,0,128,128); return sheenCv;
 }
 // screen vignette, rendered once per screen size at quarter resolution (it's a soft gradient, so upscaling is invisible)
@@ -2226,7 +2240,7 @@ function drawSheen(){
   for(const Lx of [-21,0,21]) for(let Ly=-87;Ly<=87;Ly+=29){
     const rx=Lx+(Lx-G.camX)*.5, ry=Ly+(Ly-G.cam)*.5; if(Math.abs(ry-G.cam)>vh) continue;
     ctx.save(); ctx.translate(rx,ry); ctx.scale(.5,1);
-    ctx.drawImage(sheenSprite(),-11,-11,22,22); ctx.restore();
+    ctx.drawImage(sheenSprite(),-14,-14,28,28); ctx.restore();
   }
   ctx.restore();
 }
