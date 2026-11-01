@@ -5,6 +5,7 @@
 import * as THREE from 'three';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 import {RoundedBoxGeometry} from 'three/addons/geometries/RoundedBoxGeometry.js';
+import {MarchingCubes} from 'three/addons/objects/MarchingCubes.js';
 const V=(x,y,z)=>new THREE.Vector3(x,y,z), Q=THREE.Quaternion, N=900;
 const cv=document.getElementById('c');
 const r=new THREE.WebGLRenderer({canvas:cv,antialias:true,alpha:true,preserveDrawingBuffer:true});
@@ -44,25 +45,47 @@ function pose(name,t,o={}){
   }
 }
 window.yaws=(t0)=>g.animations.map(c=>{ pose(c.name,t0||0); const f=(a,b)=>{const L=wp(B[a]).sub(wp(B[b])); const F=L.clone().cross(V(0,1,0)); return +(Math.atan2(F.x,F.z)*57.3).toFixed(1);}; return [c.name,f('LeftUpLeg','RightUpLeg'),f('LeftArm','RightArm')]; });
-const SKIN=new THREE.MeshStandardMaterial({color:window.SKINC||0xe0a27c,roughness:.72});
+const SKIN=new THREE.MeshStandardMaterial({color:window.SKINC||0xe0a27c,roughness:.6});
 const SKIN2=new THREE.MeshStandardMaterial({color:0xd08f68,roughness:.78});
-// A closed fist in its own frame: X = forward (knuckles), Y = up (thumb side), Z = toward the camera (curled fingers).
-function capAlong(r,a,b2,mat){ const A=V(...a), Bv=V(...b2), d=Bv.clone().sub(A), L=d.length(); const m=new THREE.Mesh(new THREE.CapsuleGeometry(r,L,6,14),mat);
-  m.position.copy(A.clone().add(Bv).multiplyScalar(.5)); m.quaternion.setFromUnitVectors(V(0,1,0),d.normalize()); return m; }
+// A closed fist in its own frame: X = forward (knuckles), Y = up (thumb on top), Z = toward the camera (curled fingers).
+// Sculpted as ONE smooth surface (a signed-distance field, polygonised once), modelled on a photo of a real fist:
+// the thumb grows out of the fleshy pad at the base of the palm and lies along the top, tip flush with the knuckles;
+// the four curled fingers are rounded segments that melt into the palm, with creases between them.
+const sdCap=(p,a,b,r)=>{ const pa=[p[0]-a[0],p[1]-a[1],p[2]-a[2]], ba=[b[0]-a[0],b[1]-a[1],b[2]-a[2]]; const h=Math.max(0,Math.min(1,(pa[0]*ba[0]+pa[1]*ba[1]+pa[2]*ba[2])/(ba[0]*ba[0]+ba[1]*ba[1]+ba[2]*ba[2])));
+  return Math.hypot(pa[0]-ba[0]*h,pa[1]-ba[1]*h,pa[2]-ba[2]*h)-r; };
+const sdEll=(p,c,r)=>{ const q=[(p[0]-c[0])/r[0],(p[1]-c[1])/r[1],(p[2]-c[2])/r[2]]; return (Math.hypot(...q)-1)*Math.min(...r); };
+const sdRBox=(p,c,h,rr)=>{ const q=[Math.abs(p[0]-c[0])-h[0]+rr,Math.abs(p[1]-c[1])-h[1]+rr,Math.abs(p[2]-c[2])-h[2]+rr]; return Math.hypot(Math.max(q[0],0),Math.max(q[1],0),Math.max(q[2],0))+Math.min(Math.max(q[0],q[1],q[2]),0)-rr; };
+const smin=(a,b,k)=>{ const h=Math.max(k-Math.abs(a-b),0)/k; return Math.min(a,b)-h*h*k*.25; };
+const FG=window.FG||{};
+function fistSDF(p){
+  const wrist=sdCap(p,[-.05,0,-.006],[.02,-.004,-.006],.031);
+  let hand=sdRBox(p,[.044,-.012,-.014],[.036,.05,.027],.022);
+  hand=smin(hand,sdEll(p,[.03,-.048,.004],[.032,.023,.022]),.016);              // heel of the hand (pinky side)
+  hand=smin(hand,sdEll(p,[.036,.03,.014],[.036,.028,.028]),.016);               // thenar: the fleshy pad the thumb grows from
+  // four fat curled fingers stacked tight, index right under the thumb; hard union leaves deep creases between them
+  const fing=Math.min(sdCap(p,[.064,.024,.024],[.098,.024,.026],.0172),sdCap(p,[.062,-.004,.026],[.1,-.004,.028],.0176),
+                      sdCap(p,[.062,-.032,.024],[.097,-.032,.026],.0168),sdCap(p,[.064,-.057,.018],[.09,-.057,.02],.0145));
+  hand=smin(hand,fing,.008);
+  // thick thumb along the top; the end joint rolls down over the front of the index finger
+  const th=smin(sdCap(p,[.036,.048,.014],[.074,.06,.02],.019),sdCap(p,[.074,.06,.02],[.099,.05,.026],.0175),.009);
+  const blend=smin(hand,th,.009), hard=Math.min(hand,th);
+  let d=p[0]<.05?blend:p[0]<.062?(blend*(.062-p[0])+hard*(p[0]-.05))/.012:hard;
+  return smin(d,wrist,.02);
+}
+let FIST_GEO=null;
+function fistGeo(){ if(FIST_GEO) return FIST_GEO;
+  const N=FG.res||84, C=[.04,0,0], H=.095, mc=new MarchingCubes(N,SKIN,false,false,200000); mc.isolation=0;
+  for(let z=0;z<N;z++) for(let y=0;y<N;y++) for(let x=0;x<N;x++){ const p=[C[0]+(x-N/2)/(N/2)*H,C[1]+(y-N/2)/(N/2)*H,C[2]+(z-N/2)/(N/2)*H]; mc.field[x+y*N+z*N*N]=-fistSDF(p)*400; }
+  mc.update(); const n=mc.count, g=new THREE.BufferGeometry();
+  const pos=mc.geometry.getAttribute('position').array.slice(0,n*3), nor=mc.geometry.getAttribute('normal').array.slice(0,n*3);
+  for(let i=0;i<n;i++){ pos[i*3]=C[0]+pos[i*3]*H; pos[i*3+1]=C[1]+pos[i*3+1]*H; pos[i*3+2]=C[2]+pos[i*3+2]*H; }
+  g.setAttribute('position',new THREE.BufferAttribute(pos,3)); g.setAttribute('normal',new THREE.BufferAttribute(nor,3)); g.computeVertexNormals();
+  FIST_GEO=g; return g; }
 function mkFist(){ const g=new THREE.Group(); g.matrixAutoUpdate=false;
-  g.add(capAlong(.027,[-.01,0,0],[.03,0,0],SKIN));                                       // wrist into the cuff
-  const body=new THREE.Mesh(new RoundedBoxGeometry(.10,.088,.078,6,.032),SKIN); body.position.set(.066,0,0); g.add(body);
-  // four curled fingers stacked down the near face (index on top, pinky shortest), with soft creases between them
-  const ys=[.027,.009,-.009,-.026], ln=[.03,.032,.03,.024], CR=new THREE.MeshStandardMaterial({color:0xbf8060,roughness:.9});
-  for(let i=0;i<4;i++){ const x1=.104; g.add(capAlong(.0115,[x1-ln[i],ys[i],.028],[x1,ys[i],.028],SKIN)); }
-  for(let i=0;i<3;i++){ const y=(ys[i]+ys[i+1])/2; g.add(capAlong(.0018,[.084,y,.0392],[.111,y,.0392],CR)); }
-  // thumb: from a pad at the heel of the hand it comes over the top, bends at the knuckle,
-  // and folds DOWN across the front of the index and middle fingers, tip tucked in (it never points forward)
-  const pad=new THREE.Mesh(new THREE.SphereGeometry(1,18,14),SKIN); pad.scale.set(.03,.024,.026); pad.position.set(.03,.03,.02); g.add(pad);
-  const T0=[.032,.036,.032], T1=[.07,.04,.042], T2=[.073,-.004,.044];
-  g.add(capAlong(.0155,T0,T1,SKIN)); g.add(capAlong(.0145,T1,T2,SKIN));
-  const bend=new THREE.Mesh(new THREE.SphereGeometry(.0158,14,10),SKIN); bend.position.set(...T1); g.add(bend);
-  const nail=new THREE.Mesh(new THREE.SphereGeometry(1,14,10),new THREE.MeshStandardMaterial({color:0xf2c9ae,roughness:.45})); nail.scale.set(.0085,.011,.004); nail.position.set(.073,.004,.0585); g.add(nail);
+  g.add(new THREE.Mesh(fistGeo(),SKIN));
+  // thumbnail: on the top-front of the thumb tip, facing up and out like in the photo
+  const nail=new THREE.Mesh(new THREE.SphereGeometry(1,20,14),new THREE.MeshStandardMaterial({color:0xf3cdb8,roughness:.35}));
+  nail.scale.set(.0108,.0026,.0085); nail.position.set(.1075,.0586,.0379); nail.quaternion.setFromUnitVectors(V(0,1,0),V(.6,.45,.66).normalize()); g.add(nail);
   sc.add(g); return g; }
 const FISTS={L:mkFist(),R:mkFist()};
 const CAMV=V(-Math.cos(AZ),Math.sin(EL),Math.sin(AZ)).normalize();
@@ -72,7 +95,7 @@ function placeFists(){ root.updateMatrixWorld(true);
     const F=V(0,1,0).applyQuaternion(q).normalize();
     let U=V(0,1,0).sub(F.clone().multiplyScalar(F.y)); if(U.length()<.35) U=V(0,0,1).sub(F.clone().multiplyScalar(F.z)).add(V(0,.5,0)); U.sub(F.clone().multiplyScalar(U.dot(F))).normalize();
     let P=F.clone().cross(U); if(P.dot(CAMV)<0) P.negate();
-    const S=window.FSCALE??1.45; g.matrix.makeBasis(F,U,P).scale(V(S,S,S)).setPosition(w.clone().add(F.clone().multiplyScalar(.012*S))); g.matrixWorldNeedsUpdate=true; } }
+    const S=window.FSCALE??1.2; g.matrix.makeBasis(F,U,P).scale(V(S,S,S)).setPosition(w.clone().add(F.clone().multiplyScalar(.012*S))); g.matrixWorldNeedsUpdate=true; } }
 window.close=(name,t,o,side,size,az,hideFist)=>{ pose(name,t,o||{}); if(window.ORIG){ B.LeftHand.scale.setScalar(1); B.RightHand.scale.setScalar(1); root.updateMatrixWorld(true);} placeFists();
   for(const k of ['L','R']) FISTS[k].visible=!hideFist;
   const Mx=FISTS[side].matrix, h=V().setFromMatrixPosition(Mx).add(V().setFromMatrixColumn(Mx,0).multiplyScalar(.06)); const c=new THREE.OrthographicCamera(-size,size,size,-size,.1,50); const a=(az||0)*Math.PI/180;
