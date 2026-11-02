@@ -50,7 +50,7 @@ Keyboard: WASD/arrows; J = top, U = left, K or Space = right, L or Shift = botto
 ## Project layout
 
 - `index.html` — the whole game (HTML, CSS, JavaScript; no build step)
-- `music/` — soundtrack (The Stanley Cup, Arcade Groove, Rink Bounce)
+- `music/` — soundtrack (The Stanley Cup, Arcade Groove, Rink Bounce, 血斗音爆)
 - `img/` — title screen art and the team-select backdrop
 - `icons/`, `manifest.webmanifest` — home-screen app setup
 
